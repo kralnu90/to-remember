@@ -256,7 +256,7 @@ const CLASSES={
  hero:{cls:'Fixed Point',hp:34,dmg:[4,9],arm:24,dodge:0,speed:2,tempo:5,grow:5,skills:[{key:'bolt',name:'Time Bolt',lvl:1},{key:'rewind',name:'Rewind wounds',lvl:1}]},
  warrior:{cls:'Warrior',hp:40,dmg:[5,10],arm:40,dodge:0,speed:1,tempo:0,grow:6,skills:[{key:'taunt',name:'Taunt',lvl:5}],blurb:'Tank'},
  paladin:{cls:'Paladin',hp:36,dmg:[4,9],arm:44,dodge:0,speed:1,tempo:0,grow:5,skills:[{key:'smite',name:'Smite',lvl:5}],blurb:'Tank, some healing'},
- cleric:{cls:'Cleric',hp:28,dmg:[3,6],arm:24,dodge:0,speed:2,tempo:0,grow:4,skills:[{key:'mend',name:'Mend',lvl:5}],blurb:'Healer'},
+ cleric:{cls:'Cleric',hp:28,dmg:[3,6],arm:24,dodge:0,speed:2,tempo:0,grow:4,skills:[{key:'holy',name:'Holy Light',lvl:1},{key:'mend',name:'Mend',lvl:1},{key:'lily',name:'Lily Mend',lvl:3},{key:'misery',name:'Misery',lvl:5}],blurb:'Healer, Lily gauge'},
  rogue:{cls:'Rogue',hp:24,dmg:[4,9],arm:16,dodge:12,speed:3,tempo:10,grow:3,skills:[{key:'backstab',name:'Backstab',lvl:5}],blurb:'Big single hits'},
  ranger:{cls:'Ranger',hp:28,dmg:[4,9],arm:20,dodge:6,speed:3,tempo:5,grow:4,skills:[{key:'volley',name:'Volley',lvl:5}],blurb:'Hits several enemies'},
  mage:{cls:'Mage',hp:20,dmg:[3,7],arm:8,dodge:0,speed:2,tempo:0,grow:2,skills:[{key:'firebolt',name:'Firebolt',lvl:5}],blurb:'Area magic'},
@@ -268,13 +268,13 @@ const COMP_KEYS=Object.keys(CLASSES).filter(k=>k!=='hero');
 const ACTIONS={
  attack:{cost:'cAttack',target:'enemy',label:'Attack'},defend:{cost:'cDefend',target:'none',label:'Defend'},
  bolt:{cost:'cSpell',target:'enemy'},rewind:{cost:'cHeal',target:'ally',heal:true},
- taunt:{cost:3,target:'none'},smite:{cost:8,target:'enemy'},mend:{cost:6,target:'ally',heal:true},backstab:{cost:5,target:'enemy'},
+ taunt:{cost:3,target:'none'},smite:{cost:8,target:'enemy'},mend:{cost:6,target:'ally',heal:true},holy:{cost:5,target:'enemy'},lily:{cost:1,target:'ally',heal:true},misery:{cost:4,target:'none'},backstab:{cost:5,target:'enemy'},
  volley:{cost:6,target:'none'},firebolt:{cost:8,target:'none'},flurry:{cost:4,target:'enemy'},inspire:{cost:3,target:'ally'},
  potion:{cost:'cItem',target:'ally'},phoenix:{cost:'cItem',target:'downed'},sacrifice:{cost:0,target:'sacrifice'}
 };
 // what each skill does, shown under its button
-const SKILL_INFO={attack:'100% weapon dmg',bolt:'280% weapon dmg',rewind:'Heal 20% life',taunt:'All enemies hit you',smite:'230% dmg, heals self',
- mend:'Heal 25% life',backstab:'300% dmg, +30% crit',volley:'125% dmg to 3 foes',firebolt:'160% dmg to all foes',flurry:'3 hits of 90%',
+const SKILL_INFO={attack:'100% weapon dmg',bolt:'280% weapon dmg',rewind:'Heal over 3 rounds',taunt:'All enemies hit you',smite:'230% dmg, heals self',
+ mend:'Big heal',holy:'160% dmg, grows a Lily',lily:'Heal, uses a Lily',misery:'300% dmg to all foes',backstab:'300% dmg, +30% crit',volley:'125% dmg to 3 foes',firebolt:'160% dmg to all foes',flurry:'3 hits of 90%',
  inspire:'+25% dmg, +15% crit',defend:'Take 50% less'};
 const COLOURS=['#8fd3d0','#e39ac7','#a9c4ff','#f0c27a','#b5e08a','#d7a6ff','#ff9f8a','#9fe6b8'];
 
@@ -486,7 +486,7 @@ function scaleFoe(st,base,tier){
 function startFight(st,bases,kind){
   st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;return f});
   st.phase='combat';st.fight={spent:0,kind};st.stats.fights++;
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
   st.turn=st.party.findIndex(p=>!p.down);
   log(st,`${st.enemies.map(e=>e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
@@ -500,11 +500,18 @@ function strike(st,a,f,pct,verb,critBonus){
   d=Math.max(1,Math.round(d*(1-armCut(f.arm,a.lvl))));
   log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});return d;
 }
-function heal(st,a,ally,pct,verb){const h=Math.round(ally.maxHp*pct/100)+a.lvl;ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});
-  log(st,`${a.name} ${verb} ${ally.name===a.name?'their own':ally.name+"'s"} wounds: +${h}.`)}
+// healing power comes from the healer's own weapon damage, so healers get better by gearing up. Healing past full is wasted.
+function healPower(a,pct){let h=rnd(a.dmgMin,a.dmgMax)*(1+a.dmgPct/100)*pct/100;const crit=Math.random()*100<a.critC;if(crit)h*=a.critD/100;return {h:Math.max(1,Math.round(h)),crit}}
+function applyHeal(st,a,ally,h){const real=Math.min(h,ally.maxHp-ally.hp),over=h-real;ally.hp+=real;
+  if(st.fight){st.fight.over=(st.fight.over||0)+over}st.stats.overheal=(st.stats.overheal||0)+over;bfx({k:'heal',a,t:ally,h:real});return {real,over}}
+function heal(st,a,ally,pct,verb){const {h,crit}=healPower(a,pct);const {real,over}=applyHeal(st,a,ally,h);
+  log(st,`${a.name} ${crit?'critically ':''}${verb} ${ally.name===a.name?'their own':ally.name+"'s"} wounds: +${real}${over?` (${over} overheal)`:''}.`)}
 function canUse(st,act){
   if(act==='potion')return st.items.potion>0&&st.party.some(p=>!p.down&&p.hp<p.maxHp);
   if(act==='phoenix')return st.items.phoenix>0&&st.party.some(p=>p.down);
+  const m=st.party[st.turn];
+  if(act==='lily')return !!m&&(m.lilies||0)>0;
+  if(act==='misery')return !!m&&!!m.blood;
   return true;
 }
 function act(st,act,ti){
@@ -527,8 +534,11 @@ function act(st,act,ti){
     case 'taunt':a.taunting=true;bfx({k:'buff',a,txt:'taunt'});log(st,`${a.name} roars a challenge. Every enemy turns on them.`);break;
     case 'defend':a.defending=true;bfx({k:'buff',a,txt:'brace'});log(st,`${a.name} braces.`);break;
     case 'inspire':ally.buff={dmg:25,crit:15,rounds:2};bfx({k:'buff',a,t:ally,txt:'inspired'});log(st,`${a.name} inspires ${ally.name}: +25% damage and +15% crit.`);break;
-    case 'mend':heal(st,a,ally,25,'mends');break;
-    case 'rewind':heal(st,a,ally,20,'rewinds');break;
+    case 'mend':heal(st,a,ally,200,'mends');break;
+    case 'holy':if(strike(st,a,foe,160,'smites')>0&&(a.lilies||0)<3){a.lilies=(a.lilies||0)+1;log(st,`A Lily blooms for ${a.name} (${a.lilies}/3).`)}break;
+    case 'lily':a.lilies--;heal(st,a,ally,180,'mends');a.lilyUsed=(a.lilyUsed||0)+1;if(a.lilyUsed>=3){a.lilyUsed=0;a.blood=true;bfx({k:'buff',a,txt:'blood lily'});log(st,`A Blood Lily blooms. ${a.name} can cast Misery.`)}break;
+    case 'misery':a.blood=false;live().forEach(f=>strike(st,a,f,300,'devastates'));break;
+    case 'rewind':ally.regen={pct:90,rounds:3,from:a};bfx({k:'buff',a,t:ally,txt:'rewind'});log(st,`${a.name} rewinds ${ally.name===a.name?'their own':ally.name+"'s"} wounds. They will heal over the next 3 rounds.`);break;
     case 'potion':{st.items.potion--;const h=Math.round(ally.maxHp*.4)+4;ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
     case 'phoenix':st.items.phoenix--;ally.down=false;ally.hp=Math.ceil(ally.maxHp*.4);bfx({k:'heal',a,t:ally,h:ally.hp,rev:1});log(st,`A Phoenix Down brings ${ally.name} back.`);break;
   }
@@ -536,7 +546,8 @@ function act(st,act,ti){
   if(st.enemies.every(f=>f.hp<=0)){winFight(st);return}
   advance(st);
 }
-function startTurn(st,i){const m=st.party[i];m.defending=false;m.taunting=false;if(m.buff&&--m.buff.rounds<0)m.buff=null}
+function startTurn(st,i){const m=st.party[i];m.defending=false;m.taunting=false;if(m.buff&&--m.buff.rounds<0)m.buff=null;
+  if(m.regen&&!m.down){const r=m.regen;const {h}=healPower(r.from,r.pct);const {real,over}=applyHeal(st,r.from,m,h);log(st,`${m.name} heals +${real}${over?` (${over} overheal)`:''} from Rewind.`);if(--r.rounds<=0)m.regen=null}}
 function advance(st){
   let i=st.turn+1;
   while(i<st.party.length&&st.party[i].down)i++;
@@ -559,7 +570,7 @@ function enemyPhase(st){
   }
   if(st.party.every(p=>p.down))end(st,'wipe');
 }
-function fall(st,m,cause){m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.downAt={name:st.room.name,era:st.room.era,cause};log(st,`${m.name} is down!`)}
+function fall(st,m,cause){m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.regen=null;m.downAt={name:st.room.name,era:st.room.era,cause};log(st,`${m.name} is down!`)}
 function timeMult(st){return 1+Math.min(100,st.party.filter(p=>!p.down).reduce((a,p)=>a+(p.timePct||0),0))/100}
 function winFight(st){
   let earned=0,xp=0,drops=[],cry=0;
@@ -582,8 +593,8 @@ function winFight(st){
       const sk=CLASSES[m.key].skills.find(s=>s.lvl===m.lvl);if(sk)ups.push(`${m.name} learned ${sk.name}!`)}});
   const net=earned-st.fight.spent,s=st.stats;
   if(s.best===null||net>s.best)s.best=net;if(s.worst===null||net<s.worst)s.worst=net;
-  st.sum={spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry};
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null});
+  st.sum={over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry};
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
   if(M&&M.flags)M.flags.tutorialDone=true;
   st.enemies=[];st.fight=null;st.phase='summary';
 }
@@ -668,8 +679,12 @@ function policy(st){
   const downed=st.party.map((p,i)=>({p,i})).filter(x=>x.p.down);
   if(downed.length&&st.items.phoenix>0)return['phoenix',downed[0].i];
   const low=live[0],lowF=low.p.hp/low.p.maxHp;
-  const healer=hasSkill(a,'mend')?'mend':hasSkill(a,'rewind')&&!st.party.some(p=>!p.down&&hasSkill(p,'mend'))?'rewind':null;
-  if(healer&&lowF<.45)return[healer,low.i];
+  if(hasSkill(a,'mend')){
+    if(a.blood&&hasSkill(a,'misery')&&!window.__spam)return['misery',null];
+    if(lowF<.55&&(a.lilies||0)>0&&hasSkill(a,'lily'))return['lily',low.i];
+    if(lowF<.4)return['mend',low.i];
+  }else if(hasSkill(a,'rewind')&&!st.party.some(p=>!p.down&&hasSkill(p,'mend'))&&lowF<.6&&!low.p.regen)return['rewind',low.i];
+  if(hasSkill(a,'holy')&&!window.__spam&&foes.length){const w=foes.slice().sort((x,y)=>x.f.hp-y.f.hp)[0];return['holy',w.i]}
   if(st.items.potion>0&&lowF<.25)return['potion',low.i];
   const big=foes.slice().sort((x,y)=>y.f.hp-x.f.hp)[0],weak=foes.slice().sort((x,y)=>x.f.hp-y.f.hp)[0];
   if(hasSkill(a,'taunt')&&foes.length>=2)return['taunt',null];
@@ -1069,7 +1084,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.2.0';
+const GAME_VERSION='0.3.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1377,7 +1392,7 @@ function fightView(){
     ${battleCanvas()}
     <div class="foes">${foes}</div>
     <div class="rollrow"><div style="min-width:0;flex:1"><div class="log">${S.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div></div></div>
-    <div class="turnline"><h3>${esc(a.name)}'s turn</h3><span class="small">${CLASSES[a.key].cls} · ${a.hp}/${a.maxHp} life · Tempo ${a.tempo}%${a.buff?' · inspired':''}</span></div>
+    <div class="turnline"><h3>${esc(a.name)}'s turn</h3><span class="small">${CLASSES[a.key].cls} · ${a.hp}/${a.maxHp} life · Tempo ${a.tempo}%${a.buff?' · inspired':''}${a.key==='cleric'?` · Lilies ${'❀'.repeat(a.lilies||0)}${'·'.repeat(3-(a.lilies||0))}${a.blood?' · Blood Lily ready':` · Blood ${a.lilyUsed||0}/3`}`:''}</span></div>
     ${acts}</section>`;
 }
 function partyView(){
@@ -1424,6 +1439,7 @@ function renderSheet(){
     h=`<div class="eyebrow">Encounter complete</div><h2>${s.net>=0?'A profitable fight':'That cost you'}</h2>
     <div class="ledger"><span>Time spent</span><span class="neg">−${secs(s.spent)}</span><span>Time shards earned</span><span class="pos">+${secs(s.earned)}</span>
     <span class="total">Net</span><span class="total ${s.net>=0?'pos':'neg'}">${s.net>=0?'+':'−'}${secs(Math.abs(s.net))}</span></div>
+    ${s.over?`<div class="small">${s.over} healing wasted on full health. Heal when it's needed.</div>`:''}
     <div class="small">+${s.xp} XP each${s.cry?` · +${s.cry} crystal${s.cry>1?'s':''}`:''}</div>
     ${s.ups.length?`<div class="note">${s.ups.map(esc).join('<br>')}</div>`:''}
     ${s.drops.length?`<div class="eyebrow">Loot</div>${s.drops.map(itemCard).join('')}`:''}
@@ -1655,7 +1671,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.2.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.3.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

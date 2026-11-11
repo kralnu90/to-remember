@@ -20,6 +20,14 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.3.0 · 11 November 2026
+- Clerics rework, inspired by FFXIV's White Mage: when the party is topped up, healers deal damage
+- New Cleric skills from level 1: **Holy Light** (160% damage, grows a Lily) and **Mend**
+- **Lily gauge:** each Holy Light grows a Lily (max 3). **Lily Mend** (level 3) heals for just 1s by using a Lily. Three Lily Mends bloom a Blood Lily, which unlocks **Misery** (level 5), a 300% hit on every enemy
+- Heals now scale with the healer's own weapon damage and gear, not the target's max life, and they can crit
+- Overhealing is wasted, shown in the log and the fight summary
+- Rewind wounds is now a heal over 3 rounds
+
 ### 0.2.0 · 11 November 2026
 - New combat stats: the D&D dice and AC are gone. Attacks always land unless the target dodges, armour cuts the damage you take, and crits hit for extra
 - Skills now deal a share of your weapon damage (Time Bolt hits for 280%), so better gear makes every skill stronger
