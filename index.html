@@ -122,10 +122,9 @@ body.big .wrap{zoom:1.12}
 .party{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .party .card.down{opacity:.45}
 .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--brass)}
-.rollrow{display:flex;gap:12px;align-items:center}
-.d20{width:58px;height:58px;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:22px;
+.rollrow{display:block}
+.actions .btn .si{display:block;font-size:11px;color:var(--dim);font-weight:400;margin-top:2px}
   clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--line)}
-.d20.crit{background:var(--brass);color:#1d1606}.d20.fumble{background:var(--bad);color:#1d1606}
 .log{font-size:14px;color:var(--dim);display:grid;gap:2px;max-height:132px;overflow:auto;min-width:0}
 .log div:first-child{color:var(--parch)}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -160,10 +159,6 @@ body.big .wrap{zoom:1.12}
 .credit{font-size:13px;color:var(--dim);text-align:center}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row .btn{flex:1}
-.d20.rolling{animation:d20spin .45s cubic-bezier(.3,.7,.4,1)}
-@keyframes d20spin{from{transform:rotate(0) scale(.9)}to{transform:rotate(720deg) scale(1)}}
-.d20.landed{animation:d20pop .22s ease-out}
-@keyframes d20pop{0%{transform:scale(1.3)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 /* town, gear, loot */
 .r-common{color:#d8d0bd}.r-uncommon{color:#93cf7e}.r-rare{color:#7fb0e8}.r-epic{color:#c09bef}
@@ -243,28 +238,30 @@ const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){retu
 /* ======================= tuning ======================= */
 const TUNE=[
  ['Run',[['startTime','Starting time left (seconds)',300],['target','Survival target (seconds)',1800]]],
- ['Basic action costs (seconds)',[['cAttack','Attack',3],['cSpell','Time Bolt',12],['cHeal','Rewind wounds',6],['cItem','Use an item',2],['cDefend','Defend',2],['cMove','Move to the next room',10]]],
+ ['Basic action costs (seconds)',[['cAttack','Attack',3],['cSpell','Time Bolt',7],['cHeal','Rewind wounds',5],['cItem','Use an item',2],['cDefend','Defend',2],['cMove','Move to the next room',10]]],
  ['Time drops (seconds)',[['dRegMin','Regular enemy, lowest',13],['dRegMax','Regular enemy, highest',19],['dEliteMin','Elite, lowest',55],['dEliteMax','Elite, highest',80],['dBossMin','Mini-boss, lowest',100],['dBossMax','Mini-boss, highest',140],['dTreasMin','Treasure room, lowest',30],['dTreasMax','Treasure room, highest',50]]],
  ['Smaller party bonus (multiplier)',[['b1','Solo',1.25],['b2','Two',1.12],['b3','Three',1.05],['b4','Four',1]]],
  ['Loot (%)',[['soulbound','Soulbound chance per drop',12],['dropReg','Item drop chance per regular enemy',20],['dropTreasure','Item chance in treasure rooms',40],['crystalReg','Crystal chance per fight',15]]],
  ['Companions',[['returnBase','Fallen return chance, base (%)',40],['returnPerLoop','Extra return chance per loop together (%)',10],['echoChance','Distant Echo chance per room (%)',30]]],
- ['Enemies (%)',[['hpScale','HP growth per minute survived',3.5],['lvlScale','HP growth per party level',11]]]
+ ['Combat',[['critBase','Base crit chance (%)',5],['critDmg','Base crit damage (%)',150],['lvlDmg','Damage per character level (%)',10],['lvlArm','Armour per character level',3],['armK','Armour curve, base',30],['armLvl','Armour curve, per level',10],['defendCut','Damage cut while defending (%)',50]]],
+ ['Enemies (%)',[['hpMult','Base life (%)',80],['soloLife','Life when you go solo (%)',90],['hpScale','Life growth per minute survived',3.5],['lvlScale','Life growth per party level',13],['dmgScale','Damage growth per minute survived',3.5],['dmgLvl','Damage growth per party level',7],['armScale','Armour growth per minute survived',4]]]
 ];
 const DEFAULTS={};TUNE.forEach(g=>g[1].forEach(([k,,v])=>DEFAULTS[k]=v));
-let CFG=Object.assign({},DEFAULTS,store.get('t2r-tune')||{});
+let CFG=Object.assign({},DEFAULTS,store.get('t2r-tune2')||{});
 
 /* ======================= classes ======================= */
 // speed: 1 slow, 2 medium, 3 fast. tempo: % off the time cost of this character's actions.
+// dmg: weapon damage range. arm: armour (cuts damage taken, see armCut). dodge: % chance to avoid a hit.
 const CLASSES={
- hero:{cls:'Fixed Point',hp:34,ac:13,hit:4,dmg:[1,8,2],speed:2,tempo:5,grow:5,skills:[{key:'bolt',name:'Time Bolt',lvl:1},{key:'rewind',name:'Rewind wounds',lvl:1}]},
- warrior:{cls:'Warrior',hp:40,ac:15,hit:4,dmg:[1,10,2],speed:1,tempo:0,grow:6,skills:[{key:'taunt',name:'Taunt',lvl:5}],blurb:'Tank'},
- paladin:{cls:'Paladin',hp:36,ac:16,hit:4,dmg:[1,8,2],speed:1,tempo:0,grow:5,skills:[{key:'smite',name:'Smite',lvl:5}],blurb:'Tank, some healing'},
- cleric:{cls:'Cleric',hp:28,ac:13,hit:3,dmg:[1,6,1],speed:2,tempo:0,grow:4,skills:[{key:'mend',name:'Mend',lvl:5}],blurb:'Healer'},
- rogue:{cls:'Rogue',hp:24,ac:14,hit:5,dmg:[1,6,3],speed:3,tempo:10,grow:3,skills:[{key:'backstab',name:'Backstab',lvl:5}],blurb:'Big single hits'},
- ranger:{cls:'Ranger',hp:28,ac:13,hit:5,dmg:[1,8,2],speed:3,tempo:5,grow:4,skills:[{key:'volley',name:'Volley',lvl:5}],blurb:'Hits several enemies'},
- mage:{cls:'Mage',hp:20,ac:11,hit:4,dmg:[1,4,1],speed:2,tempo:0,grow:2,skills:[{key:'firebolt',name:'Firebolt',lvl:5}],blurb:'Area magic'},
- monk:{cls:'Monk',hp:28,ac:15,hit:5,dmg:[1,6,2],speed:3,tempo:10,grow:4,twice:true,skills:[{key:'flurry',name:'Flurry',lvl:5}],blurb:'Hits twice'},
- bard:{cls:'Bard',hp:26,ac:12,hit:3,dmg:[1,6,1],speed:2,tempo:15,grow:3,skills:[{key:'inspire',name:'Inspire',lvl:5}],blurb:'Support, time tricks'}
+ hero:{cls:'Fixed Point',hp:34,dmg:[4,9],arm:24,dodge:0,speed:2,tempo:5,grow:5,skills:[{key:'bolt',name:'Time Bolt',lvl:1},{key:'rewind',name:'Rewind wounds',lvl:1}]},
+ warrior:{cls:'Warrior',hp:40,dmg:[5,10],arm:40,dodge:0,speed:1,tempo:0,grow:6,skills:[{key:'taunt',name:'Taunt',lvl:5}],blurb:'Tank'},
+ paladin:{cls:'Paladin',hp:36,dmg:[4,9],arm:44,dodge:0,speed:1,tempo:0,grow:5,skills:[{key:'smite',name:'Smite',lvl:5}],blurb:'Tank, some healing'},
+ cleric:{cls:'Cleric',hp:28,dmg:[3,6],arm:24,dodge:0,speed:2,tempo:0,grow:4,skills:[{key:'mend',name:'Mend',lvl:5}],blurb:'Healer'},
+ rogue:{cls:'Rogue',hp:24,dmg:[4,9],arm:16,dodge:12,speed:3,tempo:10,grow:3,skills:[{key:'backstab',name:'Backstab',lvl:5}],blurb:'Big single hits'},
+ ranger:{cls:'Ranger',hp:28,dmg:[4,9],arm:20,dodge:6,speed:3,tempo:5,grow:4,skills:[{key:'volley',name:'Volley',lvl:5}],blurb:'Hits several enemies'},
+ mage:{cls:'Mage',hp:20,dmg:[3,7],arm:8,dodge:0,speed:2,tempo:0,grow:2,skills:[{key:'firebolt',name:'Firebolt',lvl:5}],blurb:'Area magic'},
+ monk:{cls:'Monk',hp:28,dmg:[3,8],arm:24,dodge:10,speed:3,tempo:10,grow:4,twice:true,skills:[{key:'flurry',name:'Flurry',lvl:5}],blurb:'Hits twice'},
+ bard:{cls:'Bard',hp:26,dmg:[3,6],arm:16,dodge:4,speed:2,tempo:15,grow:3,skills:[{key:'inspire',name:'Inspire',lvl:5}],blurb:'Support, time tricks'}
 };
 const COMP_KEYS=Object.keys(CLASSES).filter(k=>k!=='hero');
 // cost: a tuning key or a fixed number of seconds. heal: counts as a heal for Patient gear.
@@ -272,9 +269,13 @@ const ACTIONS={
  attack:{cost:'cAttack',target:'enemy',label:'Attack'},defend:{cost:'cDefend',target:'none',label:'Defend'},
  bolt:{cost:'cSpell',target:'enemy'},rewind:{cost:'cHeal',target:'ally',heal:true},
  taunt:{cost:3,target:'none'},smite:{cost:8,target:'enemy'},mend:{cost:6,target:'ally',heal:true},backstab:{cost:5,target:'enemy'},
- volley:{cost:6,target:'none'},firebolt:{cost:8,target:'enemy'},flurry:{cost:4,target:'enemy'},inspire:{cost:3,target:'ally'},
+ volley:{cost:6,target:'none'},firebolt:{cost:8,target:'none'},flurry:{cost:4,target:'enemy'},inspire:{cost:3,target:'ally'},
  potion:{cost:'cItem',target:'ally'},phoenix:{cost:'cItem',target:'downed'},sacrifice:{cost:0,target:'sacrifice'}
 };
+// what each skill does, shown under its button
+const SKILL_INFO={attack:'100% weapon dmg',bolt:'280% weapon dmg',rewind:'Heal 20% life',taunt:'All enemies hit you',smite:'230% dmg, heals self',
+ mend:'Heal 25% life',backstab:'300% dmg, +30% crit',volley:'125% dmg to 3 foes',firebolt:'160% dmg to all foes',flurry:'3 hits of 90%',
+ inspire:'+25% dmg, +15% crit',defend:'Take 50% less'};
 const COLOURS=['#8fd3d0','#e39ac7','#a9c4ff','#f0c27a','#b5e08a','#d7a6ff','#ff9f8a','#9fe6b8'];
 
 /* ======================= names ======================= */
@@ -287,15 +288,16 @@ const randSur=()=>pick(SURNAMES);
 const randName=()=>randFirst()+' '+randSur();
 
 /* ======================= world ======================= */
+// arm: armour (armoured foes shrug off weak hits, so use big skills). dodge: % chance to avoid a hit.
 const FOES={
- present:[{name:'Clockwork Rat',hp:8,ac:11,hit:3,dmg:[1,4,1],xp:5},{name:'Stalled Guard',hp:15,ac:14,hit:4,dmg:[1,6,2],xp:10},
-  {name:'Ashen Townsfolk',hp:11,ac:11,hit:3,dmg:[1,6,1],xp:7},{name:'Time-Torn Hound',hp:12,ac:12,hit:5,dmg:[1,6,2],xp:9}],
- future:[{name:'Thornling',hp:9,ac:12,hit:3,dmg:[1,4,2],xp:6},{name:'Mossback Boar',hp:16,ac:12,hit:4,dmg:[1,8,1],xp:10},
-  {name:'Spore Wisp',hp:8,ac:13,hit:4,dmg:[1,4,2],xp:6},{name:'Rootbound Sentinel',hp:14,ac:14,hit:4,dmg:[1,6,2],xp:10}]
+ present:[{name:'Clockwork Rat',hp:13,dmg:[2,5],arm:0,dodge:6,xp:5},{name:'Stalled Guard',hp:24,dmg:[3,8],arm:25,dodge:0,xp:10},
+  {name:'Ashen Townsfolk',hp:18,dmg:[2,7],arm:0,dodge:0,xp:7},{name:'Time-Torn Hound',hp:19,dmg:[3,8],arm:0,dodge:12,xp:9}],
+ future:[{name:'Thornling',hp:14,dmg:[3,6],arm:0,dodge:5,xp:6},{name:'Mossback Boar',hp:26,dmg:[2,9],arm:10,dodge:0,xp:10},
+  {name:'Spore Wisp',hp:13,dmg:[3,6],arm:0,dodge:15,xp:6},{name:'Rootbound Sentinel',hp:22,dmg:[3,8],arm:30,dodge:0,xp:10}]
 };
-const ELITES={present:{name:'Warden of the Hour',hp:38,ac:15,hit:6,dmg:[1,10,3],xp:40},future:{name:'Overgrown Colossus',hp:46,ac:13,hit:5,dmg:[2,6,2],xp:45}};
-const BOSSES=[{at:600,name:'The Belltower Revenant',era:'present',hp:85,ac:15,hit:6,dmg:[2,6,3],xp:120,attacks:2,room:'The Belltower'},
-              {at:1200,name:'The Verdant Matriarch',era:'future',hp:110,ac:14,hit:7,dmg:[2,6,4],xp:160,attacks:2,room:'The Heart of the Grove'}];
+const ELITES={present:{name:'Warden of the Hour',hp:61,dmg:[4,13],arm:30,dodge:0,xp:40},future:{name:'Overgrown Colossus',hp:74,dmg:[4,14],arm:20,dodge:0,xp:45}};
+const BOSSES=[{at:600,name:'The Belltower Revenant',era:'present',hp:136,dmg:[5,15],arm:30,dodge:0,xp:120,attacks:2,room:'The Belltower'},
+              {at:1200,name:'The Verdant Matriarch',era:'future',hp:176,dmg:[6,16],arm:20,dodge:0,xp:160,attacks:2,room:'The Heart of the Grove'}];
 const PLACES={
  present:[['Market Square','Stalls frozen mid-sale. A dropped apple hangs in the air.'],['Cobbled Lane','Footsteps echo a moment after you make them.'],
   ['The Chapel','The bell has been mid-swing for longer than anyone can say.'],['Fountain Court','The water stands still in a glass arc. A bird hangs motionless above the fountain.'],
@@ -314,15 +316,26 @@ const MATERIALS=[['Leather',1],['Iron',10],['Steel',20],['Mithril',35],['Adamant
 const RARITY=[['common',50],['uncommon',32],['rare',14],['epic',4]];
 const R_NAME={common:'Common',uncommon:'Uncommon',rare:'Rare',epic:'Epic'};
 const PREFIX=[ // [key, tickets, label, stat, amount(tier)]
- ['sturdy',20,'Sturdy','hp',t=>3+2*t],['sharp',20,'Sharp','dmg',t=>1+t],['guarded',15,'Guarded','ac',t=>1+Math.floor(t/2)],
- ['keen',15,'Keen','hit',t=>1+Math.floor(t/3)],['lucky',8,'Luck-filled','crit',t=>1],['timeworn',5,'Timeworn','tempo',t=>3+t],
+ ['sturdy',20,'Sturdy','hp',t=>3+2*t],['sharp',20,'Sharp','dmg',t=>1+t],['guarded',15,'Guarded','arm',t=>4+4*t],
+ ['keen',15,'Keen','critC',t=>2+t],['nimble',8,'Nimble','dodge',t=>2+Math.floor(t/2)],['timeworn',5,'Timeworn','tempo',t=>3+t],
  ['echoing',3,'Echoing','timePct',t=>5+2*t],['patient',4,'Patient','patient',t=>10+2*t]];
-const SUFFIX=[['bear',20,'of the Bear','hp',t=>4+2*t],['ruin',20,'of Ruin','dmg',t=>1+t],['wall',15,'of the Wall','ac',t=>1+Math.floor(t/2)],
- ['prec',15,'of Precision','hit',t=>1+Math.floor(t/3)],['hour',5,'of the Hour','tempo',t=>3+t],['echo',3,'of Echoes','timePct',t=>5+2*t]];
-const BASE={weapon:t=>({dmg:1+2*t}),offhand:t=>({ac:1+t}),helm:t=>({ac:1+Math.floor(t/2),hp:2+2*t}),chest:t=>({ac:1+t,hp:3+3*t}),
- gloves:t=>({hit:1+Math.floor(t/2)}),boots:t=>({ac:1+Math.floor(t/2)}),ring:t=>({hit:1+Math.floor(t/3),hp:2+2*t}),amulet:t=>({hp:4+4*t})};
-const STAT_LABEL={hp:'HP',ac:'AC',hit:'Hit',dmg:'Dmg',crit:'Crit range',tempo:'% Tempo',timePct:'% time drops',patient:'% cheaper heals'};
-const STAT_ORDER=['dmg','hit','ac','hp','crit','tempo','timePct','patient'];
+const SUFFIX=[['bear',20,'of the Bear','hp',t=>4+2*t],['ruin',20,'of Ruin','dmg',t=>1+t],['wall',15,'of the Wall','arm',t=>4+4*t],
+ ['prec',15,'of Precision','critD',t=>10+5*t],['wind',8,'of the Wind','dodge',t=>2+Math.floor(t/2)],['hour',5,'of the Hour','tempo',t=>3+t],['echo',3,'of Echoes','timePct',t=>5+2*t]];
+const BASE={weapon:t=>({dmg:1+2*t}),offhand:t=>({arm:6+6*t}),helm:t=>({arm:3+3*t,hp:2+2*t}),chest:t=>({arm:6+6*t,hp:3+3*t}),
+ gloves:t=>({critC:1+Math.floor(t/2)}),boots:t=>({arm:3+3*t}),ring:t=>({critD:5+5*t,hp:2+2*t}),amulet:t=>({hp:4+4*t})};
+const STAT_LABEL={hp:'Life',dmg:'Damage',arm:'Armour',critC:'% Crit chance',critD:'% Crit damage',dodge:'% Dodge',tempo:'% Tempo',timePct:'% time drops',patient:'% cheaper heals'};
+const STAT_ORDER=['dmg','critC','critD','arm','dodge','hp','tempo','timePct','patient'];
+const PCT_STATS=['critC','critD','dodge','tempo','timePct','patient'];
+// old saves: turn D&D stats on gear into the new ones
+function migrateItem(it){const s=it.stats;if(!s)return;
+  if('ac' in s){s.arm=(s.arm||0)+s.ac*5;delete s.ac}
+  if('hit' in s){s.critC=(s.critC||0)+s.hit*2;delete s.hit}
+  if('crit' in s){s.critC=(s.critC||0)+s.crit*5;delete s.crit}
+  it.name=it.name.replace('Luck-filled','Keen')}
+function migrateAll(o,seen){if(!o||typeof o!=='object')return;seen=seen||new Set();if(seen.has(o))return;seen.add(o);
+  if(o.slot&&o.stats&&o.rarity){migrateItem(o);return}
+  if(Array.isArray(o.dmg)&&o.dmg.length===3&&'maxHp' in o&&o.tier){const d=o.dmg;o.dmg=[d[0]+d[2],d[0]*d[1]+d[2]];o.arm=o.arm||0;o.dodge=o.dodge||0;o.lvl=o.lvl||1;delete o.ac;delete o.hit}
+  for(const k in o)migrateAll(o[k],seen)}
 function makeItem(ilvl,minRarity){
   ilvl=Math.max(1,ilvl);
   let t=0;MATERIALS.forEach(([,l],i)=>{if(ilvl>=l)t=i});
@@ -338,8 +351,8 @@ function makeItem(ilvl,minRarity){
   if(rarity==='rare'||rarity==='epic'){const sk=tickets(SUFFIX.map(x=>[x[0],x[1]]));const s=SUFFIX.find(x=>x[0]===sk);suf=' '+s[2];add(s[3],s[4](t))}
   return {id:uid(),slot,rarity,lvl:ilvl,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<CFG.soulbound};
 }
-function power(stats){const w={hp:.5,ac:3,hit:3,dmg:3,crit:6,tempo:2,timePct:1,patient:.5};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
-function statLine(stats){return STAT_ORDER.filter(k=>stats[k]).map(k=>(k==='tempo'||k==='timePct'||k==='patient')?`+${stats[k]}${STAT_LABEL[k]}`:`+${stats[k]} ${STAT_LABEL[k]}`).join(' · ')||'No bonus'}
+function power(stats){const w={hp:.5,dmg:3,arm:.6,critC:2,critD:.4,dodge:2.5,tempo:2,timePct:1,patient:.5};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
+function statLine(stats){return STAT_ORDER.filter(k=>stats[k]).map(k=>PCT_STATS.includes(k)?`+${stats[k]}${STAT_LABEL[k]}`:`+${stats[k]} ${STAT_LABEL[k]}`).join(' · ')||'No bonus'}
 
 /* ======================= meta (kept between loops) ======================= */
 let M=null; // the save across loops
@@ -365,14 +378,18 @@ function hireCost(r){if(M.freeHires>0)return 0;return 2+Math.floor(r.lvl/3)}
 /* ======================= character stats ======================= */
 function calc(c,gear){
   const k=CLASSES[c.key],L=c.lvl;
-  const s={maxHp:k.hp+k.grow*(L-1),ac:k.ac,hit:k.hit+Math.floor((L-1)/2),dmgB:Math.floor((L-1)*.7),crit:0,tempo:k.tempo,timePct:0,patient:0};
+  const s={maxHp:k.hp+k.grow*(L-1),dmgMin:k.dmg[0],dmgMax:k.dmg[1],dmgPct:CFG.lvlDmg*(L-1),arm:k.arm+Math.round(CFG.lvlArm*(L-1)),dodge:k.dodge,
+    critC:CFG.critBase,critD:CFG.critDmg,tempo:k.tempo,timePct:0,patient:0};
   for(const sl in gear){const it=gear[sl];if(!it)continue;const st=it.stats;
-    s.maxHp+=st.hp||0;s.ac+=st.ac||0;s.hit+=st.hit||0;s.dmgB+=st.dmg||0;s.crit+=st.crit||0;s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0}
+    s.maxHp+=st.hp||0;s.dmgMin+=st.dmg||0;s.dmgMax+=st.dmg||0;s.arm+=st.arm||0;s.dodge+=st.dodge||0;s.critC+=st.critC||0;s.critD+=st.critD||0;
+    s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0}
   if(c.talent){s.maxHp=Math.round(s.maxHp*(1+c.talent/100));s.timePct+=c.talent}
-  s.tempo=Math.min(50,s.tempo);s.patient=Math.min(60,s.patient);s.crit=Math.min(3,s.crit);
+  s.tempo=Math.min(50,s.tempo);s.patient=Math.min(60,s.patient);s.dodge=Math.min(30,s.dodge);s.critC=Math.min(60,s.critC);
   return s;
 }
-function refresh(m){const s=calc(m,m.gear);const gain=s.maxHp-(m.maxHp||s.maxHp);Object.assign(m,s);if(!m.down)m.hp=Math.max(1,Math.min(m.maxHp,(m.hp??m.maxHp)+Math.max(0,gain)))}
+// share of damage armour stops against an attacker of this level: never more than 75%
+function armCut(arm,lvl){return Math.min(.75,arm/(arm+CFG.armK+CFG.armLvl*Math.max(1,lvl)))}
+function refresh(m){delete m.ac;delete m.hit;delete m.dmgB;delete m.crit;const s=calc(m,m.gear);const gain=s.maxHp-(m.maxHp||s.maxHp);Object.assign(m,s);if(!m.down)m.hp=Math.max(1,Math.min(m.maxHp,(m.hp??m.maxHp)+Math.max(0,gain)))}
 function hasSkill(m,key){return CLASSES[m.key].skills.some(s=>s.key===key&&m.lvl>=s.lvl)}
 function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;c*=1-(m.tempo||0)/100;if(A.heal)c*=1-(m.patient||0)/100;return Math.round(c*10)/10}
 function nextXp(l){return 20+18*l}
@@ -390,7 +407,7 @@ function startRun(quick){
   S={phase:'room',timeLeft:CFG.startTime,survival:0,party,items:{potion:2,phoenix:1},bag:[],crystals:0,
     enemies:[],turn:0,log:[],bossesDone:[],room:null,roomMsg:'',fight:null,sum:null,result:null,echoesFollowed:{},
     stats:{rooms:0,fights:0,kills:0,actions:0,spentAct:0,spentMove:0,earnFoes:0,earnTreasure:0,best:null,worst:null,playMs:0,items:0},
-    lastTick:Date.now(),lastRoll:null,rollId:0,delta:0,target:quick?600:CFG.target,quick:!!quick,loop:M.loop};
+    lastTick:Date.now(),delta:0,target:quick?600:CFG.target,quick:!!quick,loop:M.loop};
   S.room=makeRoom(S,null);S.room.type='start';S.room.name='The Edge of Aetherfall';S.room.era='present';
   S.room.desc='Behind you, the hamlet sits safe in the past. Ahead, the town became something else. The road stretches towards the old market square. The air feels strangely still.';
   S.script=(M.flags&&M.flags.firstRun)?0:1;
@@ -460,12 +477,11 @@ function chooseDoor(st,dir){
     st.roomMsg='A quiet shrine. The living rest and recover 40% of their health.';
   }else st.roomMsg='Nothing here but the sound of a clock that is not there.';
 }
-const SIZE_HP={1:.6,2:1,3:1,4:1};
 function scaleFoe(st,base,tier){
   const m=minutes(st),L=avgLvl(st)-1;
-  return {name:base.name,tier,maxHp:Math.max(1,Math.round(base.hp*(1+CFG.hpScale/100*m)*(1+CFG.lvlScale/100*L)*SIZE_HP[st.party.length])),
-    ac:base.ac+Math.floor(m/10)+Math.floor(L/6),hit:base.hit+Math.floor(m/7)+Math.floor(L/4),
-    dmg:[base.dmg[0],base.dmg[1],base.dmg[2]+Math.floor(m/5)+Math.floor(L/3)],xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at};
+  return {name:base.name,tier,maxHp:Math.max(1,Math.round(base.hp*(1+CFG.hpScale/100*m)*(1+CFG.lvlScale/100*L)*CFG.hpMult/100*(st.party.length===1?CFG.soloLife/100:1))),
+    lvl:Math.max(1,Math.round(L+1+m/5)),arm:Math.round(base.arm*(1+CFG.armScale/100*m+.1*L)),dodge:base.dodge,
+    dmg:base.dmg.map(v=>Math.max(1,Math.round(v*(1+CFG.dmgScale/100*m+CFG.dmgLvl/100*L)))),xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at};
 }
 function startFight(st,bases,kind){
   st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;return f});
@@ -474,18 +490,18 @@ function startFight(st,bases,kind){
   st.turn=st.party.findIndex(p=>!p.down);
   log(st,`${st.enemies.map(e=>e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
-function attackRoll(st,a,bonus,ac){
-  const d=rnd(1,20),total=d+a.hit+(a.buff?a.buff.hit:0)+bonus;
-  const res=d>=20-(a.crit||0)?'crit':d===1?'fumble':total>=ac?'hit':'miss';
-  st.lastRoll={who:a.name,d,total,ac,res};st.rollId++;return res;
-}
-function dmgRoll(a,dice,crit,extra){return roll(dice[0]*(crit?2:1),dice[1])+dice[2]+(extra||0)+(a.buff?a.buff.dmg:0)}
 function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);if(f.hp===0){log(st,`${f.name} falls.`);st.stats.kills++}}
-function strike(st,a,f,dice,bonusHit,extra,verb){
-  const r=attackRoll(st,a,bonusHit||0,f.ac);
-  if(r==='hit'||r==='crit'){const d=dmgRoll(a,dice,r==='crit',extra);log(st,`${a.name} ${r==='crit'?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit:r==='crit'});return true}
-  log(st,`${a.name} misses ${f.name}.`);bfx({k:'miss',a,f});return false;
+// pct: % of weapon damage. Hits always land unless the foe dodges. Returns damage dealt.
+function strike(st,a,f,pct,verb,critBonus){
+  if(Math.random()*100<f.dodge){log(st,`${f.name} dodges ${a.name}.`);bfx({k:'miss',a,f,txt:'dodge'});return 0}
+  const b=a.buff||{};
+  let d=rnd(a.dmgMin,a.dmgMax)*(1+(a.dmgPct+(b.dmg||0))/100)*pct/100;
+  const crit=Math.random()*100<a.critC+(b.crit||0)+(critBonus||0);if(crit)d*=a.critD/100;
+  d=Math.max(1,Math.round(d*(1-armCut(f.arm,a.lvl))));
+  log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});return d;
 }
+function heal(st,a,ally,pct,verb){const h=Math.round(ally.maxHp*pct/100)+a.lvl;ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});
+  log(st,`${a.name} ${verb} ${ally.name===a.name?'their own':ally.name+"'s"} wounds: +${h}.`)}
 function canUse(st,act){
   if(act==='potion')return st.items.potion>0&&st.party.some(p=>!p.down&&p.hp<p.maxHp);
   if(act==='phoenix')return st.items.phoenix>0&&st.party.some(p=>p.down);
@@ -500,20 +516,20 @@ function act(st,act,ti){
   if(A.target==='downed'&&(!ally||!ally.down))return;
   if(!canUse(st,act))return;
   const c=costOf(a,act),live=()=>st.enemies.filter(f=>f.hp>0);
-  st.lastRoll=null;
   switch(act){
-    case 'attack':strike(st,a,foe,CLASSES[a.key].dmg,0,a.dmgB);if(CLASSES[a.key].twice&&foe.hp>0)strike(st,a,foe,CLASSES[a.key].dmg,0,a.dmgB);break;
-    case 'bolt':strike(st,a,foe,[3,6,3],2,a.dmgB*2,'blasts');break;
-    case 'smite':strike(st,a,foe,[3,8,2],2,a.dmgB,'smites');break;
-    case 'backstab':strike(st,a,foe,[2,8,4],2,a.dmgB,'backstabs');break;
-    case 'firebolt':strike(st,a,foe,[3,6,3],2,a.dmgB,'burns');break;
-    case 'flurry':for(let i=0;i<3&&foe.hp>0;i++)strike(st,a,foe,[1,6,1],0,Math.floor(a.dmgB/2));break;
-    case 'volley':live().slice(0,3).forEach(f=>strike(st,a,f,[1,8,1],0,Math.floor(a.dmgB/2),'shoots'));break;
+    case 'attack':strike(st,a,foe,100);if(CLASSES[a.key].twice&&foe.hp>0)strike(st,a,foe,100);break;
+    case 'bolt':strike(st,a,foe,280,'blasts');break;
+    case 'smite':{const d=strike(st,a,foe,230,'smites');if(d){const h=Math.ceil(d*.3);a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}break}
+    case 'backstab':strike(st,a,foe,300,'backstabs',30);break;
+    case 'firebolt':live().forEach(f=>strike(st,a,f,160,'burns'));break;
+    case 'flurry':for(let i=0;i<3&&foe.hp>0;i++)strike(st,a,foe,90);break;
+    case 'volley':live().slice(0,3).forEach(f=>strike(st,a,f,125,'shoots'));break;
     case 'taunt':a.taunting=true;bfx({k:'buff',a,txt:'taunt'});log(st,`${a.name} roars a challenge. Every enemy turns on them.`);break;
     case 'defend':a.defending=true;bfx({k:'buff',a,txt:'brace'});log(st,`${a.name} braces.`);break;
-    case 'inspire':ally.buff={hit:2,dmg:2,rounds:2};bfx({k:'buff',a,t:ally,txt:'+2'});log(st,`${a.name} inspires ${ally.name}: +2 hit and damage.`);break;
-    case 'mend':case 'rewind':{const h=roll(2,6)+3+Math.floor(a.lvl/2);ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${a.name} ${act==='mend'?'mends':'rewinds'} ${ally.name===a.name?'their own':ally.name+"'s"} wounds: +${h}.`);break}
-    case 'potion':{st.items.potion--;const h=14+2*Math.round(avgLvl(st));ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
+    case 'inspire':ally.buff={dmg:25,crit:15,rounds:2};bfx({k:'buff',a,t:ally,txt:'inspired'});log(st,`${a.name} inspires ${ally.name}: +25% damage and +15% crit.`);break;
+    case 'mend':heal(st,a,ally,25,'mends');break;
+    case 'rewind':heal(st,a,ally,20,'rewinds');break;
+    case 'potion':{st.items.potion--;const h=Math.round(ally.maxHp*.4)+4;ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
     case 'phoenix':st.items.phoenix--;ally.down=false;ally.hp=Math.ceil(ally.maxHp*.4);bfx({k:'heal',a,t:ally,h:ally.hp,rev:1});log(st,`A Phoenix Down brings ${ally.name} back.`);break;
   }
   if(!spend(st,c,'act'))return;
@@ -533,13 +549,12 @@ function enemyPhase(st){
     for(let k=0;k<f.attacks;k++){
       const live=st.party.filter(p=>!p.down);if(!live.length)break;
       const taunter=live.find(p=>p.taunting);
-      const t=taunter||pick(live);const ac=t.ac+(t.defending?4:0);
-      const d=rnd(1,20);
-      if(d!==1&&(d===20||d+f.hit>=ac)){
-        const dmg=roll(f.dmg[0]*(d===20?2:1),f.dmg[1])+f.dmg[2];t.hp=Math.max(0,t.hp-dmg);
-        log(st,`${f.name} ${d===20?'crits':'hits'} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit:d===20});
-        if(t.hp===0)fall(st,t,f.tier);
-      }else{log(st,`${f.name} misses ${t.name}.`);bfx({k:'emiss',f,t})}
+      const t=taunter||pick(live);
+      if(Math.random()*100<t.dodge){log(st,`${t.name} dodges ${f.name}.`);bfx({k:'emiss',f,t,txt:'dodge'});continue}
+      let dmg=rnd(f.dmg[0],f.dmg[1]);const crit=Math.random()<.05;if(crit)dmg*=1.5;
+      dmg*=1-armCut(t.arm,f.lvl);if(t.defending)dmg*=1-CFG.defendCut/100;dmg=Math.max(1,Math.round(dmg));
+      t.hp=Math.max(0,t.hp-dmg);log(st,`${f.name} ${crit?'crits':'hits'} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit});
+      if(t.hp===0)fall(st,t,f.tier);
     }
   }
   if(st.party.every(p=>p.down))end(st,'wipe');
@@ -660,8 +675,10 @@ function policy(st){
   if(hasSkill(a,'taunt')&&foes.length>=2)return['taunt',null];
   if(hasSkill(a,'volley')&&foes.length>=2)return['volley',null];
   if(hasSkill(a,'inspire')){const t=live.find(x=>x.p.key!=='bard'&&!x.p.buff);if(t&&foes.length)return['inspire',t.i]}
-  for(const k of ['backstab','smite','firebolt','flurry'])if(hasSkill(a,k)&&(big.f.tier!=='reg'||big.f.hp>18))return[k,big.i];
-  if(hasSkill(a,'bolt')&&big.f.tier!=='reg')return['bolt',big.i];
+  if(hasSkill(a,'firebolt')&&foes.length>=2)return['firebolt',null];
+  if(window.__spam)return['attack',weak.i];
+  for(const k of ['backstab','smite','firebolt','flurry'])if(hasSkill(a,k)&&(big.f.tier!=='reg'||big.f.hp>25||big.f.arm>0))return[k,big.i];
+  if(hasSkill(a,'bolt')&&(big.f.tier!=='reg'||big.f.arm>0||big.f.hp>30))return['bolt',big.i];
   return['attack',weak.i];
 }
 function autoEquip(st){st.party.forEach((m,mi)=>{st.bag.filter(it=>it.lvl<=m.lvl).forEach(it=>{const cur=m.gear[it.slot];if(!cur||power(it.stats)>power(cur.stats))equip(st,mi,it.id)})})}
@@ -840,7 +857,7 @@ function stepBattle(){
     ({hit:()=>SFX.hit(e.crit),ehit:SFX.hurt,miss:SFX.miss,emiss:SFX.miss,heal:SFX.heal,buff:SFX.buff})[e.k]?.(e.crit);
     if(e.k==='hit'){BAT.flash.set(e.f,8);BAT.fx.push({o:e.f,txt:String(e.d),col:e.crit?'#e0ae52':'#ece3cc',big:e.crit,t:0});if(e.f.hp<=0&&!BAT.q.some(x=>touches(x,e.f)))BAT.fade.set(e.f,0)}
     else if(e.k==='ehit'){BAT.flash.set(e.t,8);BAT.fx.push({o:e.t,txt:String(e.d),col:'#e07a66',big:e.crit,t:0})}
-    else if(e.k==='miss'||e.k==='emiss')BAT.fx.push({o:tgt,txt:'miss',col:'#a79f8d',t:0});
+    else if(e.k==='miss'||e.k==='emiss')BAT.fx.push({o:e.k==='emiss'?e.t:tgt,txt:e.txt||'miss',col:'#a79f8d',t:0});
     else if(e.k==='heal')BAT.fx.push({o:e.t,txt:(e.rev?'up! ':'+')+e.h,col:'#8fc77a',t:0,spark:1});
     else if(e.k==='buff')BAT.fx.push({o:e.t||e.a,txt:e.txt,col:'#e0ae52',t:0});
   }
@@ -1052,7 +1069,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.1.1';
+const GAME_VERSION='0.2.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1117,7 +1134,7 @@ function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is 
   <div class="note"><b>Every action costs time.</b> Attacking, casting, healing and walking through a door all take seconds off your clock. Beating enemies and finding time shards gives seconds back.</div>
   <div class="small"><b>Survive the run.</b> Last until the survival target (30 minutes on a full run) without your clock hitting zero, and the run is cleared. Run out of time, or lose the whole party, and the loop resets.</div>
   <div class="small"><b>The loop always resets.</b> Your levels stay. Gear turns to dust unless it's <b class="sb">soulbound</b> and you're wearing it. After a cleared run you get 30 seconds of frozen time to swap gear.</div>
-  <div class="small"><b>Fights are turn-based.</b> Pick an action, then tap a target on the battle scene or its card. Each attack rolls a d20 against the enemy's armour (AC).</div>
+  <div class="small"><b>Fights are turn-based.</b> Pick an action, then tap a target on the battle scene or its card. Attacks always land unless the target dodges. Armour cuts the damage you take, crits hit for extra, and skills deal a share of your weapon damage, so better gear makes every skill stronger.</div>
   <div class="small"><b>Smaller parties earn more.</b> Fewer companions means bigger time drops and more XP each.</div>
   <div class="small"><b>Fallen companions.</b> Anyone still down when the loop resets is lost. Some come back later as strangers who don't remember you. Follow their Distant Echoes to help them remember, and they return stronger.</div>
   <div class="small"><b>The Hamlet</b> is safe. Hire companions at the Tavern, choose your party at the Campfire, check gear at your Cottage, and talk to the Wizard. He knows more than he's letting on.</div>
@@ -1321,7 +1338,7 @@ function renderRun(){
   if(SET.tools&&S.phase!=='end'&&S.party.some(m=>m.key!=='hero'&&!m.down))h+=`<button class="btn ghost" data-a="sacrifice" style="border-style:dashed">Test: sacrifice a companion</button>`;
   h+=`<div class="row">${S.phase!=='end'?'<button class="btn ghost" data-a="abandon">Abandon run</button>':''}<button class="btn ghost" data-a="menu">Main menu</button>${SET.tools?'<button class="btn ghost" data-a="tune">Tuning</button>':''}</div>`;
   h+=foot();
-  app.innerHTML=h;animateRoll();
+  app.innerHTML=h;
   if(S.phase==='summary'&&!UI.sheet&&!batBusy())UI.sheet='summary';
 }
 function roomView(){
@@ -1347,23 +1364,20 @@ function fightView(){
   const a=S.party[S.turn],p=UI.pending,pt=p?ACTIONS[p].target:null;
   const foes=S.enemies.map((f,i)=>`<button class="card ${f.hp<=0?'dead':''} ${f.tier!=='reg'?'elite':''} ${pt==='enemy'&&f.hp>0?'target':''}" data-foe="${i}" ${f.hp<=0?'disabled':''}>
       ${f.tier!=='reg'?`<span class="tag">${f.tier==='boss'?'Mini-boss':'Elite'}</span>`:''}
-      <span class="nm">${esc(f.name)}</span><span class="sub">AC ${f.ac} · ${f.hp}/${f.maxHp} HP</span><span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`).join('');
-  const lr=S.lastRoll;
-  const chip=lr?`<div class="d20 ${lr.res==='crit'?'crit':lr.res==='fumble'?'fumble':''}" id="d20">${lr.d}</div>`:`<div class="d20">d20</div>`;
-  const rt=lr?`${esc(lr.who)} rolled ${lr.d} → ${lr.total} vs AC ${lr.ac}`:'';
+      <span class="nm">${esc(f.name)}</span><span class="sub">${f.hp}/${f.maxHp} life${f.arm?` · ${Math.round(armCut(f.arm,a.lvl)*100)}% armour`:''}${f.dodge?` · ${f.dodge}% dodge`:''}</span><span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`).join('');
   let acts;
   if(p){acts=`<div class="note">${{enemy:'Tap an enemy',ally:'Tap an ally in your party',downed:'Tap a fallen ally',sacrifice:'Tap a companion to sacrifice'}[pt]}.</div><button class="btn" data-a="cancel">Cancel</button>`}
   else{
-    const btn=(k,label,locked)=>`<button class="btn" data-act="${k}" ${canUse(S,k)&&!locked?'':'disabled'}><span>${label}</span><span class="cost">−${secs(costOf(a,k))}</span></button>`;
+    const btn=(k,label,locked)=>`<button class="btn" data-act="${k}" ${canUse(S,k)&&!locked?'':'disabled'}><span>${label}${SKILL_INFO[k]?`<span class="si">${SKILL_INFO[k]}</span>`:''}</span><span class="cost">−${secs(costOf(a,k))}</span></button>`;
     const sk=CLASSES[a.key].skills.map(s=>a.lvl>=s.lvl?btn(s.key,s.name):`<button class="btn" disabled><span>${s.name}</span><span class="cost">Lv ${s.lvl}</span></button>`).join('');
-    acts=(M.flags&&!M.flags.tutorialDone?`<div class="note"><div class="eyebrow">Combat: your turn</div>Each action costs time. Stronger abilities may cost more, but defeating enemies can reward you with time shards. Choose an action for your active character.</div>`:'')+`<div class="actions">${btn('attack',CLASSES[a.key].twice?'Attack ×2':'Attack')}${sk}${btn('defend','Defend')}${btn('potion',`Potion ×${S.items.potion}`)}${btn('phoenix',`Phoenix Down ×${S.items.phoenix}`)}</div>`;
+    acts=(M.flags&&!M.flags.tutorialDone?`<div class="note"><div class="eyebrow">Combat: your turn</div>Each action costs time. Skills cost more but hit much harder, so fights end sooner and you take fewer hits. Defeating enemies rewards you with time shards. Choose an action for your active character.</div>`:'')+`<div class="actions">${btn('attack',CLASSES[a.key].twice?'Attack ×2':'Attack')}${sk}${btn('defend','Defend')}${btn('potion',`Potion ×${S.items.potion}`)}${btn('phoenix',`Phoenix Down ×${S.items.phoenix}`)}</div>`;
   }
   return `<section class="room">
     <div class="turnline"><h2>${esc(S.room.name)}</h2><span class="era ${S.room.era}">${S.room.era}</span></div>
     ${battleCanvas()}
     <div class="foes">${foes}</div>
-    <div class="rollrow">${chip}<div style="min-width:0;flex:1"><div class="small" id="rolltext">${rt}</div><div class="log">${S.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div></div></div>
-    <div class="turnline"><h3>${esc(a.name)}'s turn</h3><span class="small">${CLASSES[a.key].cls} · Tempo ${a.tempo}%${a.buff?' · inspired':''}</span></div>
+    <div class="rollrow"><div style="min-width:0;flex:1"><div class="log">${S.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div></div></div>
+    <div class="turnline"><h3>${esc(a.name)}'s turn</h3><span class="small">${CLASSES[a.key].cls} · ${a.hp}/${a.maxHp} life · Tempo ${a.tempo}%${a.buff?' · inspired':''}</span></div>
     ${acts}</section>`;
 }
 function partyView(){
@@ -1373,7 +1387,7 @@ function partyView(){
     const tgt=(t==='ally'&&!m.down)||(t==='downed'&&m.down)||(t==='sacrifice'&&!m.down&&m.key!=='hero');
     return `<button class="card ${m.down?'down':''} ${S.phase==='combat'&&i===S.turn&&!p?'active':''} ${tgt?'target':''}" data-ally="${i}" ${tgt?'':'tabindex="-1"'}>
       <span class="nm" style="color:${m.stranger||m.key==='hero'?'inherit':m.colour}">${esc(m.name)}</span><span class="sub">${CLASSES[m.key].cls} · Lv ${m.lvl}${m.taunting?' · taunting':''}${m.defending?' · bracing':''}${m.down?' · down':''}</span>
-      <span class="sub">${m.hp}/${m.maxHp} HP · XP ${m.xp}/${nextXp(m.lvl)}</span><span class="hp"><i style="width:${m.hp/m.maxHp*100}%"></i></span></button>`}).join('')}</section>
+      <span class="sub">${m.hp}/${m.maxHp} life · XP ${m.xp}/${nextXp(m.lvl)}</span><span class="hp"><i style="width:${m.hp/m.maxHp*100}%"></i></span></button>`}).join('')}</section>
     <div class="small" style="text-align:center">${S.party.length===1?'Solo':S.party.length+' in party'} (×${partyBonus(S)} drops) · Crystals this run: ${S.crystals}</div>`;
 }
 function endView(){
@@ -1454,7 +1468,7 @@ function gearSheet(){
   const s=calc(m,m.gear);
   return `<div class="eyebrow">Gear${inRun?'':' · in town you can only look'}</div><h2>${esc(m.name)}</h2>
     <div class="tabs">${tabs}</div>
-    <div class="small">${CLASSES[m.key].cls} · Lv ${m.lvl} · ${s.maxHp} HP · AC ${s.ac} · Hit +${s.hit} · Dmg +${s.dmgB} · Tempo ${s.tempo}%${s.timePct?` · +${s.timePct}% time`:''}</div>
+    <div class="small">${CLASSES[m.key].cls} · Lv ${m.lvl} · ${s.maxHp} life · Damage ${s.dmgMin}–${s.dmgMax}${s.dmgPct?` (+${s.dmgPct}%)`:''} · Armour ${s.arm} · Crit ${s.critC}% ×${s.critD/100}${s.dodge?` · Dodge ${s.dodge}%`:''} · Tempo ${s.tempo}%${s.timePct?` · +${s.timePct}% time`:''}</div>
     <div class="slots">${slots}</div>${detail}
     ${inRun&&!editable?'<div class="note">You can only change gear between rooms, not mid-fight.</div>':''}
     <p class="small">◆ glowing items are soulbound. At the reset, only soulbound items you're wearing are kept.</p>
@@ -1494,17 +1508,6 @@ function tuneSheet(){
     <div class="row"><button class="btn" data-a="tunereset">Reset numbers</button><button class="btn primary" data-a="close">Done</button></div>`;
 }
 
-/* ---------- dice animation ---------- */
-function animateRoll(){
-  const el=document.getElementById('d20');
-  if(!el||!S||!S.lastRoll||S.rollId===UI.shownRoll)return;
-  UI.shownRoll=S.rollId;
-  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const final=el.textContent,cls=el.className,txt=document.getElementById('rolltext');
-  if(txt)txt.style.visibility='hidden';el.className='d20 rolling';let n=0;
-  const t=setInterval(()=>{if(!el.isConnected){clearInterval(t);return}el.textContent=rnd(1,20);
-    if(++n>=8){clearInterval(t);el.textContent=final;el.className=cls+' landed';if(txt)txt.style.visibility='visible'}},55);
-}
 let lockTimer=null;
 function startLock(){
   S.lock='running';UI.lockLeft=30;clearInterval(lockTimer);
@@ -1554,7 +1557,7 @@ document.addEventListener('click',e=>{
     case 'gear':UI.sheet='gear';UI.gearSlot=null;render();break;
     case 'close':UI.sheet=null;render();break;
     case 'tune':UI.sheet='tune';render();break;
-    case 'tunereset':CFG=Object.assign({},DEFAULTS);store.set('t2r-tune',CFG);render();break;
+    case 'tunereset':CFG=Object.assign({},DEFAULTS);store.set('t2r-tune2',CFG);render();break;
     case 'givecry':M.crystals+=5;save();render();break;
     case 'wipe':UI.sheet='wipe';render();break;
     case 'wipeyes':UI.menu=true;M=null;S=null;store.del('t2r-meta2');store.del('t2r-run2');UI.sheet=null;render();break;
@@ -1579,7 +1582,7 @@ document.addEventListener('input',e=>{
   if(t.id==='rvLiked'){UI.rvLiked=t.value;return}
   if(t.id==='rvChange'){UI.rvChange=t.value;return}
   if(t.id==='rvName'){UI.rvName=t.value;return}
-  if(t.closest('#tuneform')){const v=parseFloat(t.value);if(!isNaN(v)&&v>=0){CFG[t.name]=v;store.set('t2r-tune',CFG)}}
+  if(t.closest('#tuneform')){const v=parseFloat(t.value);if(!isNaN(v)&&v>=0){CFG[t.name]=v;store.set('t2r-tune2',CFG)}}
 });
 function after(){
   if(S&&S.phase==='end'&&S.lock==='ready')startLock();
@@ -1590,7 +1593,7 @@ function after(){
 function boot(data){
   applySet();
   if(data&&data.M!==undefined){M=data.M;S=data.S}
-  else{M=store.get('t2r-meta2');S=store.get('t2r-run2')}
+  else{M=store.get('t2r-meta2');S=store.get('t2r-run2');migrateAll(M);migrateAll(S);if(S&&S.party)S.party.forEach(refresh)}
   if(M){flags();if(M.loop>1)M.flags.firstRun=true}
   if(S){S.lastTick=Date.now();if(S.phase==='end'&&S.lock==='running')S.lock='done'}
   if(M&&M.events&&M.events.length&&!S){UI.eventsSeen=false}else UI.eventsSeen=true;
@@ -1652,7 +1655,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.1.1",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.2.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

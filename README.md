@@ -8,7 +8,7 @@ A time-loop dungeon crawler from Kralnu Games. A wizard's spell went wrong and l
 
 - **Every action costs time.** Attacks, spells, heals and doors all take seconds off your clock. Beating enemies earns seconds back.
 - **The loop always resets.** Your levels stay. Only soulbound gear you're wearing survives.
-- **Turn-based fights** with d20 rolls, drawn as pixel art straight from code: one sprite per class, coloured for each character.
+- **Turn-based fights** with Diablo-style stats (life, damage, armour, crits, dodge), drawn as pixel art straight from code: one sprite per class, coloured for each character.
 - **Fallen companions** are lost at the reset, but some come back as strangers. Follow their Distant Echoes to help them remember.
 - **The Hamlet:** hire at the Tavern, pick your party at the Campfire, manage gear at your Cottage, and keep an eye on the Wizard.
 
@@ -19,6 +19,15 @@ This is an early build. Things will change, and saves may reset between versions
 ☕ [Support on Ko-fi](https://ko-fi.com/kralnu90) · ✉️ hello@kralnugames.com
 
 ## Changelog
+
+### 0.2.0 · 11 November 2026
+- New combat stats: the D&D dice and AC are gone. Attacks always land unless the target dodges, armour cuts the damage you take, and crits hit for extra
+- Skills now deal a share of your weapon damage (Time Bolt hits for 280%), so better gear makes every skill stronger
+- Skills are worth using: Time Bolt now costs 7s instead of 12s, Firebolt really hits every enemy, Volley and Flurry hit harder
+- Some enemies are armoured or quick on their feet, so plain attacks won't cut it
+- Skill buttons show what each skill does
+- New gear stats: Armour, Crit chance, Crit damage and Dodge. Gear from older saves is converted automatically
+- Tuning numbers have been reset to suit the new system
 
 ### 0.1.1 · 11 November 2026
 - Fixed: the battle scene and Hamlet map could go blank once a returning stranger joined your party, and fight rewards wouldn't appear until you refreshed
