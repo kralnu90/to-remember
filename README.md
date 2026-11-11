@@ -20,6 +20,11 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.5.1 · 11 November 2026
+- The Tavern now always has a Cleric (the healer) and a tank among each loop's recruits
+- The General Store's stock rotates: Potions and Phoenix Downs are always in, plus three of the five supplies, changing every loop
+- The store now sells three pieces of basic gear each loop (common or uncommon, around your hero's level). It waits in your bag for your next run
+
 ### 0.5.0 · 11 November 2026
 - **The hero's skill tree:** a spider's web of six disciplines (Chronomancy, Hero Arts, Destruction, Preservation, Exploration, Remembrance), 10 nodes each, plus six hybrid keystones between neighbours. Open it from the Hamlet
 - Earn 1 skill point per hero level, plus bonus points at loops 5, 10, 15, 20 and 30. Reset the tree free once, then for crystals

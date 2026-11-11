@@ -378,14 +378,21 @@ function potionCap(){return 5+rank('pockets')}
 function priceOf(k){const d=STORE.find(x=>x[0]===k);return Math.round(d[2]*(1+.08*((hero()?hero().lvl:1)-1))*(1-(TF().discount||0)/100))}
 function sellValue(it){return Math.round(SELL[it.rarity]*(1+it.lvl/5))}
 function bindCost(it){return Math.max(1,BIND[it.rarity]+Math.floor(it.lvl/4)+((M&&M.binds)||0)-(TF().bindCut||0))}
-function rollStore(){const st={};STORE.forEach(([k,,,n])=>st[k]=n+rank('favour')+(k==='potion'?rank('pockets'):0));return {loop:M.loop,stock:st}}
-function ensureEconomy(){if(!M)return;M.tree=M.tree||{owned:[],respecs:0};M.gold=M.gold||0;M.pack=M.pack||{};M.sanctum=M.sanctum||{};M.binds=M.binds||0;if(!M.store||M.store.loop!==M.loop)M.store=rollStore()}
+// potions and Phoenix Downs are always in; three of the five supplies rotate each loop, plus three pieces of basic gear
+function rollStore(){const st={};const sup=STORE.filter(([k])=>k!=='potion'&&k!=='phoenix').sort(()=>Math.random()-.5).slice(0,3).map(x=>x[0]);
+  STORE.forEach(([k,,,n])=>{if(k==='potion'||k==='phoenix'||sup.includes(k))st[k]=n+rank('favour')+(k==='potion'?rank('pockets'):0)});
+  const hl=hero()?hero().lvl:1,basic=()=>{let it;for(let i=0;i<20;i++){it=makeItem(Math.max(1,hl-rnd(0,1)));if(it.rarity==='common'||it.rarity==='uncommon')break}it.soul=false;return it};
+  const gear=Array.from({length:3},basic);
+  return {loop:M.loop,stock:st,gear}}
+function gearPrice(it){return Math.round(sellValue(it)*2.5*(1-(TF().discount||0)/100))}
+function buyGear(id){ensureEconomy();const g=M.store.gear||[],i=g.findIndex(x=>x.id===id);if(i<0)return;const it=g[i],p=gearPrice(it);if(M.gold<p)return;M.gold-=p;g.splice(i,1);(M.pack.gear=M.pack.gear||[]).push(it)}
+function ensureEconomy(){if(!M)return;M.tree=M.tree||{owned:[],respecs:0};M.gold=M.gold||0;M.pack=M.pack||{};M.sanctum=M.sanctum||{};M.binds=M.binds||0;if(!M.store||M.store.loop!==M.loop||!M.store.gear)M.store=rollStore()}
 function buy(k){ensureEconomy();const p=priceOf(k);if(M.gold<p||!(M.store.stock[k]>0))return;
   if(k==='potion'&&2+(M.pack.potion||0)>=potionCap())return;
   M.gold-=p;M.store.stock[k]--;M.pack[k]=(M.pack[k]||0)+1}
 function bindItem(c,sl){const it=c.gear[sl];if(!it||it.soul)return;const cost=bindCost(it);if(M.crystals<cost)return;M.crystals-=cost;it.soul=true;M.binds=(M.binds||0)+1}
 function buySanctum(k){const d=SANCTUM.find(x=>x[0]===k);if(rank(k)>=d[3])return;const c=sanctumCost(k);if(M.crystals<c)return;M.crystals-=c;M.sanctum[k]=rank(k)+1;
-  if(k==='favour'||k==='pockets'){STORE.forEach(([kk])=>{if(k==='favour'||kk==='potion')M.store.stock[kk]=(M.store.stock[kk]||0)+1})}}
+  if(k==='favour'||k==='pockets'){Object.keys(M.store.stock).forEach(kk=>{if(k==='favour'||kk==='potion')M.store.stock[kk]++})}}
 function loneMult(st){if(!TF().lone)return 0;return st.party.length<=2?20:st.party.length>=4?-10:0}
 function gainGold(st,g){g=Math.round(g*(1+Math.min(100,10*rank('purse')+(TF().gold||0)+loneMult(st))/100));st.gold=(st.gold||0)+g;st.stats.gold=(st.stats.gold||0)+g;return g}
 function addPotion(st,n){const before=st.items.potion;st.items.potion=Math.min(potionCap(),st.items.potion+n);return st.items.potion-before}
@@ -473,7 +480,10 @@ function rollTavern(){
   const slots=Math.max(0,3-keep.length);
   const out=keep.slice();
   for(let i=0;i<slots;i++)out.push({id:uid(),key:pick(COMP_KEYS),lvl:Math.max(1,hl-rnd(0,2)),stranger:null});
-  if(!out.some(r=>['warrior','paladin','cleric'].includes(r.key))&&out.length){const i=out.findIndex(r=>!r.stranger);if(i>=0)out[i].key=pick(['warrior','paladin','cleric'])}
+  // every loop has at least one Cleric (the healer) and one tank among the fresh recruits
+  const fresh=out.filter(r=>!r.stranger);
+  if(fresh.length&&!out.some(r=>r.key==='cleric'))fresh[0].key='cleric';
+  if(!out.some(r=>r.key==='warrior'||r.key==='paladin')){const t=fresh.find(r=>r.key!=='cleric')||fresh[1];if(t)t.key=pick(['warrior','paladin'])}
   return out;
 }
 function hireCost(r){if(M.freeHires>0)return 0;return 2+Math.floor(r.lvl/3)}
@@ -518,7 +528,7 @@ function startRun(quick){
   S.room=makeRoom(S,null);S.room.type='start';S.room.name='The Edge of Aetherfall';S.room.era='present';
   S.room.desc='Behind you, the hamlet sits safe in the past. Ahead, the town became something else. The road stretches towards the old market square. The air feels strangely still.';
   S.script=(M.flags&&M.flags.firstRun)?0:1;
-  M.pack={};S.tf=TF();fillDoors(S,S.room);
+  (pk.gear||[]).forEach(it=>S.bag.push(it));M.pack={};S.tf=TF();fillDoors(S,S.room);
 }
 function makeRoom(st,entry){
   const futureShare=Math.min(.8,.2+minutes(st)/40);
@@ -1228,7 +1238,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.5.0';
+const GAME_VERSION='0.5.1';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1467,14 +1477,16 @@ function renderTown(){
 const SHOP_LINES=['Back again? Funny, I could swear I sold you that yesterday.','Everything must go. It always does, round here.','Gold only. Crystals give me a headache.','Stock comes back every morning. Don\'t ask me how.'];
 function storeSheet(){
   ensureEconomy();if(!UI.shopLine||UI.shopLoop!==M.loop){UI.shopLine=pick(SHOP_LINES);UI.shopLoop=M.loop}
-  const packed=STORE.filter(([k])=>M.pack[k]).map(([k,n])=>`${n} ×${M.pack[k]}`).join(', ');
+  const packed=STORE.filter(([k])=>M.pack[k]).map(([k,n])=>`${n} ×${M.pack[k]}`).concat((M.pack.gear||[]).map(it=>esc(it.name))).join(', ');
   return `<div class="eyebrow">The General Store · Loop ${M.loop}</div><h2>Supplies</h2>
     <div class="wizard"><span class="eyebrow">The shopkeeper</span><q>${esc(UI.shopLine)}</q></div>
     <div class="turnline"><span class="small">Your purse: <b style="color:var(--brass)">${M.gold} gold</b></span><span class="small">Potion limit ${potionCap()}</span></div>
-    <div class="events">${STORE.map(([k,n,,,desc])=>{const p=priceOf(k),left=M.store.stock[k]||0,capped=k==='potion'&&2+(M.pack.potion||0)>=potionCap();
+    <div class="events">${STORE.filter(([k])=>k in M.store.stock).map(([k,n,,,desc])=>{const p=priceOf(k),left=M.store.stock[k]||0,capped=k==='potion'&&2+(M.pack.potion||0)>=potionCap();
       return `<div class="item"><span class="nm">${n}</span><span class="st">${desc}</span><span class="st">${left} in stock${M.pack[k]?` · packed ${M.pack[k]}`:''}</span>
       <button class="btn" data-buy="${k}" ${M.gold<p||!left||capped?'disabled':''} style="min-height:40px">${capped?'Carry limit reached':`Buy · ${p} gold`}</button></div>`}).join('')}</div>
-    <p class="small">${packed?`Packed for your next run: ${packed}.`:'Nothing packed yet.'} What you buy comes with you on your next run. Anything unused is lost at the reset. Stock refreshes every loop.</p>
+    <div class="eyebrow">Basic gear this loop</div>
+    ${(M.store.gear||[]).map(it=>itemCard(it,`<button class="btn" data-bgear="${it.id}" ${M.gold<gearPrice(it)?'disabled':''} style="min-height:40px">Buy · ${gearPrice(it)} gold</button>`)).join('')||'<span class="small">Sold out until the next loop.</span>'}
+    <p class="small">${packed?`Packed for your next run: ${packed}.`:'Nothing packed yet.'} What you buy comes with you on your next run. Gear waits in your bag, so equip it in the first room. Anything unused, and gear that isn't soulbound, is lost at the reset. Stock changes every loop.</p>
     <button class="btn primary" data-a="close">Leave</button>`;
 }
 function sanctumSheet(){
@@ -1810,6 +1822,7 @@ document.addEventListener('click',e=>{
   if(d.mbuy){marketBuy(d.mbuy);SFX.buff();save();render();return}
   if(d.anchor){S.anchorId=d.anchor;save();render();return}
   if(d.sell){sellItem(S,d.sell);SFX.buff();save();render();return}
+  if(d.bgear){buyGear(d.bgear);SFX.buff();save();render();return}
   if(d.buy){buy(d.buy);SFX.buff();save();render();return}
   if(d.sanc){buySanctum(d.sanc);SFX.buff();save();render();return}
   if(d.bind){const party=[hero()].concat(M.party.map(id=>M.chars.find(c=>c.id===id)).filter(Boolean));bindItem(party[UI.gearChar],d.bind);SFX.buff();save();render();return}
@@ -1939,7 +1952,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.5.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.5.1",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
