@@ -24,6 +24,7 @@ Upload this file at the start of a new session so Claude can pick up where we le
 - **Engine (no DOM):** `startRun`, `chooseDoor`, `startFight`, `act`, `enemyPhase`, `winFight`, `applyReset`. Tuning numbers live in `TUNE`/`CFG`. `window.__sim(n, keys, lvl, gear)` runs balance sims in the console.
 - **Classes:** `CLASSES` (hero is the Fixed Point plus 8 companion classes). **Enemies:** `FOES`, `ELITES`, `BOSSES`.
 - **Combat stats (since 0.2.0, Diablo-style, no dice):** life, weapon damage range (`dmgMin`–`dmgMax`) plus `dmgPct` (+`lvlDmg`% per level), armour (`armCut(arm, attackerLvl)` = arm ÷ (arm + `armK` + `armLvl`×level), max 75%), dodge % (max 30), crit chance/damage (base 5% / 150%). `strike(st,a,f,pct)` deals pct% weapon damage; skill percentages live in `act()` and `SKILL_INFO`. Enemies scale life/damage/armour by minutes survived and party level (`scaleFoe`). Old saves are converted by `migrateAll` on load.
+- **Economy (since 0.4.0):** `M.gold` persists (the wizard enchanted the hero's purse). `STORE` items are bought into `M.pack`, unpacked in `startRun` (items, start time, `S.buffs`), then `M.pack` is cleared. `M.store` stock rerolls each loop (`rollStore`). Selling (`sellItem`) only in the frozen window after a cleared run. Crystal sinks: binding at the Cottage (`bindItem`, cost rises with `M.binds`) and the Sanctum (`SANCTUM`, `M.sanctum`, cost = base × (rank+1)^1.5). `ensureEconomy()` fills missing fields on old saves.
 - **Healing (since 0.3.0):** `healPower(a,pct)` = pct% of the healer's weapon damage (can crit); `applyHeal` caps at max life and tracks overheal. Cleric Lily gauge lives on the run copy of the member (`lilies`, `lilyUsed`, `blood`): Holy Light grows a Lily, Lily Mend spends one, 3 Lily Mends give a Blood Lily for Misery. Rewind sets `regen`, ticked in `startTurn`.
 - **Battle scene:** pixel art drawn in code. `SPR` holds one text sprite per class and enemy shape; `FOE_LOOK` maps each enemy name to a sprite, palette and flags (`big`, `warp`, `float`, `flip`). `palOf(m)` colours a companion from their name colour plus a hash of their id; strangers get faded colours.
 - **Battle animations:** the engine pushes events with `bfx()` (`hit`, `miss`, `ehit`, `emiss`, `heal`, `buff`). `BAT` queues them and `stepBattle()` plays them one by one. The fight summary waits until the queue is empty (`batBusy()`). Settings → Battle speed runs more steps per frame.
@@ -37,10 +38,12 @@ Upload this file at the start of a new session so Claude can pick up where we le
 
 ## Agreed but not built yet (don't re-decide)
 - Hero skill tree (Kris is thinking about it).
-- General Store (potions, Phoenix Downs, supplies bought with gold, wiped at reset).
+- More crystal sinks, in this order of preference: Reforging (reroll a stat or upgrade rarity), hero skill tree nodes bought with crystals, rebuilding the Hamlet (blacksmith, bigger tavern, new services).
+- Market Square hero passive (dungeon only, once per run): the Fixed Point pulls time to heel in the Market Square, the frozen stalls come to life and become a shop for a moment. Replaces the shelved travelling merchant idea (Kris felt a merchant didn't fit the theme). Possibly part of the skill tree.
 - Possibly let the battle scene replace the enemy cards.
 
 ## Session log
 - 10 Nov 2026: pixel battle scene and pixel Hamlet added to the prototype; turned into v0.1.0 with menus, settings, reviews, Ko-fi, install and update; pushed to `to-remember` and added to the hub's new WIP page.
 - 11 Nov 2026: v0.2.0 swapped the D&D d20/AC system for Diablo-style stats (always hit, armour as damage cut, crits, dodge, skills as % weapon damage); rebalanced with `__sim` so using skills beats spamming Attack.
 - 11 Nov 2026: v0.3.0 Cleric rework (Holy Light, Lily gauge, Lily Mend, Misery), heals scale from the healer, overheal wasted, Rewind became a heal over time. Sims: healer parties no longer dominate; Warrior (Taunt + armour) is now the standout.
+- 11 Nov 2026: v0.4.0 gold, General Store, selling in the reset window, binding with crystals, Wizard's Sanctum. A full run earns roughly 300 gold at level 1 (sim).

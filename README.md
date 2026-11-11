@@ -10,7 +10,7 @@ A time-loop dungeon crawler from Kralnu Games. A wizard's spell went wrong and l
 - **The loop always resets.** Your levels stay. Only soulbound gear you're wearing survives.
 - **Turn-based fights** with Diablo-style stats (life, damage, armour, crits, dodge), drawn as pixel art straight from code: one sprite per class, coloured for each character.
 - **Fallen companions** are lost at the reset, but some come back as strangers. Follow their Distant Echoes to help them remember.
-- **The Hamlet:** hire at the Tavern, pick your party at the Campfire, manage gear at your Cottage, and keep an eye on the Wizard.
+- **The Hamlet:** hire at the Tavern, pick your party at the Campfire, buy supplies at the General Store, bind gear at your Cottage, and spend crystals in the Wizard's Sanctum.
 
 Works offline once installed. Saves stay on your device.
 
@@ -19,6 +19,14 @@ This is an early build. Things will change, and saves may reset between versions
 ☕ [Support on Ko-fi](https://ko-fi.com/kralnu90) · ✉️ hello@kralnugames.com
 
 ## Changelog
+
+### 0.4.0 · 11 November 2026
+- **Gold:** enemies and treasure rooms drop gold. The wizard enchanted your purse, so gold stays with you between loops
+- **The General Store is open:** Potions, Phoenix Downs, Pocket Watch (+20s start time), Stopwatch (next action is free), Whetstone (+10% damage), Ward Charm (+20 armour) and Smoke Bomb (escape a fight). Stock is limited and refreshes every loop. What you buy is packed for your next run, and anything unused is lost at the reset
+- Potions now have a carry limit (5)
+- **Sell your loot** while time is frozen after a cleared run, one item at a time or all at once
+- **Binding:** spend crystals at your Cottage to make a piece of gear soulbound. Each binding costs a little more than the last
+- **The Wizard's Sanctum:** permanent crystal upgrades: Borrowed Time, Deep Pockets, Shopkeeper's Favour, Binding Thread and Lucky Purse
 
 ### 0.3.0 · 11 November 2026
 - Clerics rework, inspired by FFXIV's White Mage: when the party is topped up, healers deal damage
