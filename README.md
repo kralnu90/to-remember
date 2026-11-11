@@ -20,6 +20,15 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.5.0 · 11 November 2026
+- **The hero's skill tree:** a spider's web of six disciplines (Chronomancy, Hero Arts, Destruction, Preservation, Exploration, Remembrance), 10 nodes each, plus six hybrid keystones between neighbours. Open it from the Hamlet
+- Earn 1 skill point per hero level, plus bonus points at loops 5, 10, 15, 20 and 30. Reset the tree free once, then for crystals
+- Drag, pinch or use + and − to move around the web, and tap a node to learn it
+- New hero skills from the tree: **Slow** and **Rewind Turn** (undo the last enemy round)
+- **Door hints:** Exploration and Remembrance can show what's behind a door before you open it
+- **Pull Time to Heel** (Chronomancy capstone): once per run in the Market Square, the frozen stalls open as a shop and the party heals
+- Plus Unbroken, Anchor, Beyond the Loop, Chain Reaction and more. Full list in the design notes
+
 ### 0.4.0 · 11 November 2026
 - **Gold:** enemies and treasure rooms drop gold. The wizard enchanted your purse, so gold stays with you between loops
 - **The General Store is open:** Potions, Phoenix Downs, Pocket Watch (+20s start time), Stopwatch (next action is free), Whetstone (+10% damage), Ward Charm (+20 armour) and Smoke Bomb (escape a fight). Stock is limited and refreshes every loop. What you buy is packed for your next run, and anything unused is lost at the reset

@@ -270,10 +270,10 @@ const ACTIONS={
  bolt:{cost:'cSpell',target:'enemy'},rewind:{cost:'cHeal',target:'ally',heal:true},
  taunt:{cost:3,target:'none'},smite:{cost:8,target:'enemy'},mend:{cost:6,target:'ally',heal:true},holy:{cost:5,target:'enemy'},lily:{cost:1,target:'ally',heal:true},misery:{cost:4,target:'none'},backstab:{cost:5,target:'enemy'},
  volley:{cost:6,target:'none'},firebolt:{cost:8,target:'none'},flurry:{cost:4,target:'enemy'},inspire:{cost:3,target:'ally'},
- potion:{cost:'cItem',target:'ally'},stopwatch:{cost:0,target:'none'},smoke:{cost:'cItem',target:'none'},phoenix:{cost:'cItem',target:'downed'},sacrifice:{cost:0,target:'sacrifice'}
+ slow:{cost:3,target:'enemy'},rturn:{cost:4,target:'none'},potion:{cost:'cItem',target:'ally'},stopwatch:{cost:0,target:'none'},smoke:{cost:'cItem',target:'none'},phoenix:{cost:'cItem',target:'downed'},sacrifice:{cost:0,target:'sacrifice'}
 };
 // what each skill does, shown under its button
-const SKILL_INFO={stopwatch:'Next action is free',smoke:'Escape, no rewards',attack:'100% weapon dmg',bolt:'280% weapon dmg',rewind:'Heal over 3 rounds',taunt:'All enemies hit you',smite:'230% dmg, heals self',
+const SKILL_INFO={slow:'Next enemy hit −50%',rturn:'Undo the last enemy round',stopwatch:'Next action is free',smoke:'Escape, no rewards',attack:'100% weapon dmg',bolt:'280% weapon dmg',rewind:'Heal over 3 rounds',taunt:'All enemies hit you',smite:'230% dmg, heals self',
  mend:'Big heal',holy:'160% dmg, grows a Lily',lily:'Heal, uses a Lily',misery:'300% dmg to all foes',backstab:'300% dmg, +30% crit',volley:'125% dmg to 3 foes',firebolt:'160% dmg to all foes',flurry:'3 hits of 90%',
  inspire:'+25% dmg, +15% crit',defend:'Take 50% less'};
 const COLOURS=['#8fd3d0','#e39ac7','#a9c4ff','#f0c27a','#b5e08a','#d7a6ff','#ff9f8a','#9fe6b8'];
@@ -349,7 +349,7 @@ function makeItem(ilvl,minRarity){
   let pre='',suf='';
   if(rarity!=='common'){const pk=tickets(PREFIX.map(x=>[x[0],x[1]]));const p=PREFIX.find(x=>x[0]===pk);pre=p[2]+' ';add(p[3],p[4](t))}
   if(rarity==='rare'||rarity==='epic'){const sk=tickets(SUFFIX.map(x=>[x[0],x[1]]));const s=SUFFIX.find(x=>x[0]===sk);suf=' '+s[2];add(s[3],s[4](t))}
-  return {id:uid(),slot,rarity,lvl:ilvl,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<CFG.soulbound+2*rank('thread')};
+  return {id:uid(),slot,rarity,lvl:ilvl,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<Math.min(40,CFG.soulbound+2*rank('thread')+(TF().soul||0))};
 }
 function power(stats){const w={hp:.5,dmg:3,arm:.6,critC:2,critD:.4,dodge:2.5,tempo:2,timePct:1,patient:.5};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
 function statLine(stats){return STAT_ORDER.filter(k=>stats[k]).map(k=>PCT_STATS.includes(k)?`+${stats[k]}${STAT_LABEL[k]}`:`+${stats[k]} ${STAT_LABEL[k]}`).join(' · ')||'No bonus'}
@@ -375,27 +375,94 @@ const BIND={common:2,uncommon:4,rare:8,epic:15};
 const rank=k=>(M&&M.sanctum&&M.sanctum[k])||0;
 function sanctumCost(k){const d=SANCTUM.find(x=>x[0]===k);return Math.round(d[2]*Math.pow(rank(k)+1,1.5))}
 function potionCap(){return 5+rank('pockets')}
-function priceOf(k){const d=STORE.find(x=>x[0]===k);return Math.round(d[2]*(1+.08*((hero()?hero().lvl:1)-1)))}
+function priceOf(k){const d=STORE.find(x=>x[0]===k);return Math.round(d[2]*(1+.08*((hero()?hero().lvl:1)-1))*(1-(TF().discount||0)/100))}
 function sellValue(it){return Math.round(SELL[it.rarity]*(1+it.lvl/5))}
-function bindCost(it){return BIND[it.rarity]+Math.floor(it.lvl/4)+((M&&M.binds)||0)}
+function bindCost(it){return Math.max(1,BIND[it.rarity]+Math.floor(it.lvl/4)+((M&&M.binds)||0)-(TF().bindCut||0))}
 function rollStore(){const st={};STORE.forEach(([k,,,n])=>st[k]=n+rank('favour')+(k==='potion'?rank('pockets'):0));return {loop:M.loop,stock:st}}
-function ensureEconomy(){if(!M)return;M.gold=M.gold||0;M.pack=M.pack||{};M.sanctum=M.sanctum||{};M.binds=M.binds||0;if(!M.store||M.store.loop!==M.loop)M.store=rollStore()}
+function ensureEconomy(){if(!M)return;M.tree=M.tree||{owned:[],respecs:0};M.gold=M.gold||0;M.pack=M.pack||{};M.sanctum=M.sanctum||{};M.binds=M.binds||0;if(!M.store||M.store.loop!==M.loop)M.store=rollStore()}
 function buy(k){ensureEconomy();const p=priceOf(k);if(M.gold<p||!(M.store.stock[k]>0))return;
   if(k==='potion'&&2+(M.pack.potion||0)>=potionCap())return;
   M.gold-=p;M.store.stock[k]--;M.pack[k]=(M.pack[k]||0)+1}
 function bindItem(c,sl){const it=c.gear[sl];if(!it||it.soul)return;const cost=bindCost(it);if(M.crystals<cost)return;M.crystals-=cost;it.soul=true;M.binds=(M.binds||0)+1}
 function buySanctum(k){const d=SANCTUM.find(x=>x[0]===k);if(rank(k)>=d[3])return;const c=sanctumCost(k);if(M.crystals<c)return;M.crystals-=c;M.sanctum[k]=rank(k)+1;
   if(k==='favour'||k==='pockets'){STORE.forEach(([kk])=>{if(k==='favour'||kk==='potion')M.store.stock[kk]=(M.store.stock[kk]||0)+1})}}
-function gainGold(st,g){g=Math.round(g*(1+.1*rank('purse')));st.gold=(st.gold||0)+g;st.stats.gold=(st.stats.gold||0)+g;return g}
+function loneMult(st){if(!TF().lone)return 0;return st.party.length<=2?20:st.party.length>=4?-10:0}
+function gainGold(st,g){g=Math.round(g*(1+Math.min(100,10*rank('purse')+(TF().gold||0)+loneMult(st))/100));st.gold=(st.gold||0)+g;st.stats.gold=(st.stats.gold||0)+g;return g}
 function addPotion(st,n){const before=st.items.potion;st.items.potion=Math.min(potionCap(),st.items.potion+n);return st.items.potion-before}
 function sellItem(st,id){const i=st.bag.findIndex(x=>x.id===id);if(i<0)return 0;const it=st.bag[i];st.bag.splice(i,1);const g=sellValue(it);st.gold=(st.gold||0)+g;st.stats.sold=(st.stats.sold||0)+g;return g}
+
+/* ======================= the hero's skill tree (a spider's web of six disciplines) ======================= */
+// Ring order matters: each discipline touches the two beside it, and each neighbouring pair shares one hybrid keystone.
+const BRANCHES=[['chrono','Chronomancy','#8fd3d0'],['arts','Hero Arts','#d7a6ff'],['destr','Destruction','#ff9f8a'],['pres','Preservation','#b5e08a'],['explo','Exploration','#f0c27a'],['remem','Remembrance','#a9c4ff']];
+const B_NAME=Object.fromEntries(BRANCHES.map(b=>[b[0],b[1]])),B_COL=Object.fromEntries(BRANCHES.map(b=>[b[0],b[2]]));
+const T_REQ={minor:0,passive:3,keystone:6,milestone:0,skill:0,capstone:9};
+// [name, type, description, effects]
+const TREE_DEF={
+ chrono:[['Timekeeper','minor','+4% time shard gain',{shard:4}],['Swift Thought','minor','+3% tempo (the hero\'s actions cost less time)',{tempo:3}],['Shard Collector','minor','+4% time shard gain',{shard:4}],
+  ['Measured Steps','minor','Doors cost 1s less',{doorCut:1}],['Lingering Moment','passive','Win a fight with nobody down: get 3s back',{linger:1}],['Accelerated Thought','minor','+4% tempo',{tempo:4}],
+  ['Last Grains','keystone','Under 60s left: the whole party deals +25% damage. Drawback: −10% time shard gain at all times',{lastGrains:1,shard:-10}],['Deep Reserves','minor','+6% time shard gain',{shard:6}],
+  ['Time Mastery','milestone','+10% time shard gain and +5% tempo',{shard:10,tempo:5}],['Pull Time to Heel','capstone','Once per run, in the Market Square: time resumes, the frozen stalls open as a shop, and the party heals 25% life',{market:1}]],
+ arts:[['Focus','minor','Time Bolt +20% damage',{boltDmg:20}],['Gentle Hands','minor','Rewind wounds heals +15%',{rewindHeal:15}],['Quick Casting','minor','Time Bolt costs 0.5s less',{boltCost:-.5}],
+  ['Deep Focus','minor','Time Bolt +20% damage',{boltDmg:20}],['Echo Bolt','passive','Time Bolt has a 25% chance to also hit a second enemy for 50%',{echoBolt:1}],['Lasting Rewind','minor','Rewind wounds lasts 4 rounds instead of 3',{rewindRounds:1}],
+  ['Overcharge','keystone','Time Bolt +60% damage. Drawback: it costs 3s more',{boltDmg:60,boltCost:3}],['Slow','skill','New skill (3s): one enemy deals 50% less damage on its next attack',{slow:1}],
+  ['Mastery of Self','milestone','All hero skills +15% damage and healing',{heroSkill:15}],['Rewind Turn','capstone','New skill, once per fight: undo the last enemy round (the party\'s life goes back to how it was before it)',{rewindTurn:1}]],
+ destr:[['Edge','minor','+5% damage',{dmg:5}],['Keen Eye','minor','+2% crit chance',{critC:2}],['Honed Edge','minor','+5% damage',{dmg:5}],['Brutal','minor','+15% crit damage',{critD:15}],
+  ['Executioner','passive','+20% damage against enemies below 25% life',{exec:1}],['Sunder','minor','Ignore 10 of the enemy\'s armour',{sunder:10}],['Glass Cannon','keystone','+30% damage. Drawback: −20% max life',{dmg:30,hpPct:-20}],
+  ['Sharper Eye','minor','+3% crit chance',{critC:3}],['Devastation','milestone','+10% damage and +20% crit damage',{dmg:10,critD:20}],['Chain Reaction','capstone','When the hero kills an enemy, 30% of that hit splashes onto another enemy',{chain:1}]],
+ pres:[['Sturdy','minor','+6 max life',{hp:6}],['Thick Skin','minor','+6 armour',{arm:6}],['Hardy','minor','+8 max life',{hp:8}],['Bracing','minor','Defend cuts an extra 10% damage',{defend:10}],
+  ['Field Medic','passive','Potions heal 25% more',{potionHeal:25}],['Light on Your Feet','minor','+3% dodge',{dodge:3}],['Iron Will','keystone','+40 armour. Drawback: −10% damage',{arm:40,dmg:-10}],
+  ['Emergency Supplies','minor','Start every run with 1 extra potion',{potionStart:1}],['Greater Warding','milestone','+10% max life',{hpPct:10}],['Unbroken','capstone','Once per run, a hit that would down the hero leaves them at 1 life instead',{unbroken:1}]],
+ explo:[['Dungeon Insight','minor','25% of doors show a hint of what\'s behind them',{hint:25}],['Pickpocket','minor','+8% gold found',{gold:8}],['Scavenger','minor','+5% item drop chance',{drop:5}],
+  ['Light Fingers','minor','+8% gold found',{gold:8}],['Treasure Sense','passive','Treasure rooms appear 50% more often',{treasure:50}],['Haggler','minor','General Store prices −10%',{discount:10}],
+  ['Lone Wanderer','keystone','Solo or with 1 companion: +20% gold and drops. Drawback: −10% with 3 companions',{lone:1}],['Scout','minor','Door hints rise to 60% of doors',{hint:35}],
+  ['Dungeon Scholar','milestone','+15% gold and +10% item drop chance',{gold:15,drop:10}],['Sixth Sense','capstone','Every door shows what\'s behind it, and 1 room in 5 has an extra door',{sixth:1}]],
+ remem:[['Familiar Faces','minor','Companions gain +10% XP',{compXp:10}],['Remembered Path','minor','Distant Echo chance +10%',{echo:10}],['Faded Imprint','minor','+1% soulbound chance on drops',{soul:1}],
+  ['Lessons Kept','minor','The hero gains +10% XP',{heroXp:10}],['Familiar Routes','passive','The first 3 rooms of every run show what\'s behind their doors',{routes:1}],['Echo Bond','minor','Strangers need 1 fewer loop to remember',{echoBond:1}],
+  ['Anchor','keystone','At each reset, one non-soulbound item the hero wears (your pick) survives. Drawback: −10% gold found',{anchor:1,gold:-10}],['Binding Echo','minor','Binding costs 2 fewer crystals',{bindCut:2}],
+  ['Eternal Memory','milestone','+2% soulbound chance and +10% crystals found',{soul:2,cry:10}],['Beyond the Loop','capstone','Once per run, a companion still down at the reset is kept, not lost',{beyond:1}]]
+};
+const HYBRIDS=[['artificer','Temporal Artificer','chrono','arts','After using a Stopwatch, or killing an enemy with Time Bolt, the hero\'s next skill costs half the time',{artificer:1}],
+ ['executioner','Spell Executioner','arts','destr','Time Bolt crits deal +50% crit damage',{boltCritD:50}],
+ ['survivor','Battle Survivor','destr','pres','When the hero kills an enemy, they heal 5% of their max life',{survivor:1}],
+ ['relic','Relic Guardian','pres','explo','After a treasure or shrine room, the party takes 20% less damage in the next fight',{relic:1}],
+ ['cartographer','Echo Cartographer','explo','remem','Distant Echo rooms always hold treasure',{echoCart:1}],
+ ['archivist','Soul Archivist','remem','chrono','Déjà vu: the first fight of every run costs no time, and mini-bosses drop 25% more time shards',{archivist:1}]];
+const TREE={};
+for(const [b] of BRANCHES)TREE_DEF[b].forEach(([name,type,desc,fx],i)=>{const id=b+'_'+String(i+1).padStart(2,'0');TREE[id]={id,br:b,n:i+1,name,type,desc,fx}});
+HYBRIDS.forEach(([k,name,a,b,desc,fx])=>{const id='hy_'+k;TREE[id]={id,br:'hybrid',a,b,name,type:'hybrid',desc,fx}});
+const LOOP_POINTS=[5,10,15,20,30];
+function treeOwned(){return (M&&M.tree&&M.tree.owned)||[]}
+function treeFx(){const o={};for(const id of treeOwned()){const n=TREE[id];if(!n)continue;for(const k in n.fx)o[k]=(o[k]||0)+n.fx[k]}return o}
+const TF=()=>treeFx();
+function pointsEarned(){if(!M)return 0;const h=hero();return Math.max(0,(h?h.lvl:1)-1)+LOOP_POINTS.filter(l=>M.loop>=l).length}
+function pointsFree(){return pointsEarned()-treeOwned().length}
+function branchPts(b){return treeOwned().filter(id=>TREE[id]&&TREE[id].br===b).length}
+function treeState(id){const n=TREE[id],own=treeOwned();if(own.includes(id))return 'owned';
+  let linked,why='';
+  if(n.type==='hybrid'){linked=own.includes(n.a+'_05')&&own.includes(n.b+'_05');if(branchPts(n.a)<5||branchPts(n.b)<5){linked=false;why=`Needs 5 points in ${B_NAME[n.a]} and ${B_NAME[n.b]}`}}
+  else{linked=n.n===1||own.includes(n.br+'_'+String(n.n-1).padStart(2,'0'));const req=T_REQ[n.type]||0;if(branchPts(n.br)<req){linked=false;why=`Needs ${req} points in ${B_NAME[n.br]}`}}
+  if(!linked)return {s:'locked',why:why||'Connect to it first'};
+  if(pointsFree()<1)return {s:'nopoints',why:'No skill points left. Level up your hero or reach loop milestones'};
+  return 'open';
+}
+function treeBuy(id){if(treeState(id)!=='open')return;M.tree.owned.push(id)}
+function respecCost(){return (M.tree.respecs||0)===0?0:10+treeOwned().length}
+function treeRespec(){const c=respecCost();if(M.crystals<c||!treeOwned().length)return;M.crystals-=c;M.tree.owned=[];M.tree.respecs=(M.tree.respecs||0)+1}
+// door hints: roll what's behind a door when the room is made, so a hint can tell the truth
+function rollType(st){const m=minutes(st),tf=TF();return tickets([['fight',48],['elite',m>=3?7:0],['treasure',12*(1+(tf.treasure||0)/100)],['shrine',7],['quiet',26]])}
+function fillDoors(st,room){const tf=TF();let ch=Math.min(100,tf.hint||0);if(tf.sixth||(tf.routes&&st.stats.rooms<3))ch=100;
+  if(tf.sixth&&Math.random()<.2){const free=DIRS.filter(d=>d!==room.entry&&!room.doors[d]);if(free.length)room.doors[pick(free)]={}}
+  for(const d in room.doors){const dr=room.doors[d];if(dr.echo)continue;dr.type=rollType(st);dr.hint=Math.random()*100<ch}}
+const HINT={fight:'Fight',elite:'Elite',treasure:'Treasure',shrine:'Shrine',quiet:'Quiet'};
+function skillsOf(m){const base=CLASSES[m.key].skills;if(m.key!=='hero')return base;const tf=TF(),x=base.slice();
+  if(tf.slow)x.push({key:'slow',name:'Slow',lvl:1});if(tf.rewindTurn)x.push({key:'rturn',name:'Rewind Turn',lvl:1});return x}
 
 /* ======================= meta (kept between loops) ======================= */
 let M=null; // the save across loops
 let S=null; // the current run
 function newChar(key,name,lvl,joinLoop){return {id:uid(),key,name,lvl:lvl||1,xp:0,gear:{},joinLoop:joinLoop||1,colour:pick(COLOURS),talent:null,stranger:null}}
 function newGame(heroName){
-  M={memorial:[],loop:1,crystals:0,gold:0,pack:{},sanctum:{},binds:0,freeHires:2,chars:[newChar('hero',heroName,1,1)],party:[],fallen:[],tavern:[],last:null,events:[],recalls:0,lost:0};
+  M={tree:{owned:[],respecs:0},memorial:[],loop:1,crystals:0,gold:0,pack:{},sanctum:{},binds:0,freeHires:2,chars:[newChar('hero',heroName,1,1)],party:[],fallen:[],tavern:[],last:null,events:[],recalls:0,lost:0};
   M.tavern=rollTavern();
   M.events=[{type:'intro'}];
 }
@@ -420,14 +487,16 @@ function calc(c,gear){
     s.maxHp+=st.hp||0;s.dmgMin+=st.dmg||0;s.dmgMax+=st.dmg||0;s.arm+=st.arm||0;s.dodge+=st.dodge||0;s.critC+=st.critC||0;s.critD+=st.critD||0;
     s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0}
   if(c.talent){s.maxHp=Math.round(s.maxHp*(1+c.talent/100));s.timePct+=c.talent}
+  if(c.key==='hero'&&M&&M.tree){const tf=TF();s.timePct+=tf.shard||0;s.tempo+=tf.tempo||0;s.dmgPct+=tf.dmg||0;s.critC+=tf.critC||0;s.critD+=tf.critD||0;
+    s.maxHp+=tf.hp||0;s.arm+=tf.arm||0;s.dodge+=tf.dodge||0;s.maxHp=Math.max(1,Math.round(s.maxHp*(1+(tf.hpPct||0)/100)))}
   s.tempo=Math.min(50,s.tempo);s.patient=Math.min(60,s.patient);s.dodge=Math.min(30,s.dodge);s.critC=Math.min(60,s.critC);
   return s;
 }
 // share of damage armour stops against an attacker of this level: never more than 75%
 function armCut(arm,lvl){return Math.min(.75,arm/(arm+CFG.armK+CFG.armLvl*Math.max(1,lvl)))}
 function refresh(m){delete m.ac;delete m.hit;delete m.dmgB;delete m.crit;const s=calc(m,m.gear);const gain=s.maxHp-(m.maxHp||s.maxHp);Object.assign(m,s);if(!m.down)m.hp=Math.max(1,Math.min(m.maxHp,(m.hp??m.maxHp)+Math.max(0,gain)))}
-function hasSkill(m,key){return CLASSES[m.key].skills.some(s=>s.key===key&&m.lvl>=s.lvl)}
-function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;c*=1-(m.tempo||0)/100;if(A.heal)c*=1-(m.patient||0)/100;return Math.round(c*10)/10}
+function hasSkill(m,key){return skillsOf(m).some(s=>s.key===key&&m.lvl>=s.lvl)}
+function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;if(act==='bolt'&&m.key==='hero')c=Math.max(1,c+(TF().boltCost||0));c*=1-(m.tempo||0)/100;if(A.heal)c*=1-(m.patient||0)/100;return Math.round(c*10)/10}
 function nextXp(l){return 20+18*l}
 
 /* ======================= run engine (no DOM) ======================= */
@@ -441,7 +510,7 @@ function startRun(quick){
   const party=ids.map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean).map(c=>{const m=clone(c);m.hp=null;m.maxHp=null;m.down=false;m.downAt=null;refresh(m);m.hp=m.maxHp;return m});
   party.sort((a,b)=>CLASSES[b.key].speed-CLASSES[a.key].speed);
   ensureEconomy();const pk=M.pack||{};
-  S={phase:'room',timeLeft:CFG.startTime+15*rank('time')+20*(pk.watch||0),survival:0,party,items:{potion:Math.min(potionCap(),2+(pk.potion||0)),phoenix:1+(pk.phoenix||0),stopwatch:pk.stopwatch||0,smoke:pk.smoke||0},
+  S={phase:'room',timeLeft:CFG.startTime+15*rank('time')+20*(pk.watch||0),survival:0,party,items:{potion:Math.min(potionCap(),2+(pk.potion||0)+(TF().potionStart||0)),phoenix:1+(pk.phoenix||0),stopwatch:pk.stopwatch||0,smoke:pk.smoke||0},
     buffs:{dmg:10*(pk.whetstone||0),arm:20*(pk.ward||0)},freeNext:false,bag:[],crystals:0,gold:0,
     enemies:[],turn:0,log:[],bossesDone:[],room:null,roomMsg:'',fight:null,sum:null,result:null,echoesFollowed:{},
     stats:{rooms:0,fights:0,kills:0,actions:0,spentAct:0,spentMove:0,earnFoes:0,earnTreasure:0,best:null,worst:null,playMs:0,items:0},
@@ -449,7 +518,7 @@ function startRun(quick){
   S.room=makeRoom(S,null);S.room.type='start';S.room.name='The Edge of Aetherfall';S.room.era='present';
   S.room.desc='Behind you, the hamlet sits safe in the past. Ahead, the town became something else. The road stretches towards the old market square. The air feels strangely still.';
   S.script=(M.flags&&M.flags.firstRun)?0:1;
-  M.pack={};
+  M.pack={};S.tf=TF();fillDoors(S,S.room);
 }
 function makeRoom(st,entry){
   const futureShare=Math.min(.8,.2+minutes(st)/40);
@@ -458,8 +527,8 @@ function makeRoom(st,entry){
   const doors={};DIRS.filter(d=>d!==entry).sort(()=>Math.random()-.5).slice(0,rnd(1,3)).forEach(d=>doors[d]={});
   // a Distant Echo can replace one door for a companion still retracing their steps
   const seekers=st.party.filter(m=>m.stranger&&!m.down&&m.stranger.mem<m.stranger.need);
-  if(seekers.length&&Math.random()*100<CFG.echoChance){const s=pick(seekers);const d=pick(Object.keys(doors));doors[d]={echo:s.id}}
-  return {era,name,desc,doors,entry,type:null,insp:0};
+  if(seekers.length&&Math.random()*100<CFG.echoChance+(TF().echo||0)){const s=pick(seekers);const d=pick(Object.keys(doors));doors[d]={echo:s.id}}
+  const room={era,name,desc,doors,entry,type:null,insp:0};fillDoors(st,room);return room;
 }
 function spend(st,s,kind){
   st.timeLeft-=s;st.survival+=s;st.delta=-s;
@@ -473,7 +542,7 @@ function end(st,kind){st.phase='end';st.result={kind};st.enemies=[];st.lock=kind
 function chooseDoor(st,dir){
   if(st.phase!=='room'||!st.room.doors[dir])return;
   const door=st.room.doors[dir];
-  if(!spend(st,CFG.cMove,'move'))return;
+  if(!spend(st,Math.max(1,CFG.cMove-(TF().doorCut||0)),'move'))return;
   st.stats.rooms++;
   if(door.echo){
     const m=st.party.find(x=>x.id===door.echo);
@@ -481,41 +550,45 @@ function chooseDoor(st,dir){
     st.room={era:lm.era,name:lm.name,desc:'A place you have never been. Or have you?',doors:{},entry:OPP[dir],type:'echo'};
     DIRS.filter(d=>d!==OPP[dir]).sort(()=>Math.random()-.5).slice(0,rnd(1,3)).forEach(d=>st.room.doors[d]={});
     st.echoesFollowed[m.id]=(st.echoesFollowed[m.id]||0)+1;
+    fillDoors(st,st.room);
     st.roomMsg=`${m.name} stops dead. "I've... been here before." Something is coming back to them.`;
+    if(TF().echoCart){const before=st.roomMsg;treasureRoom(st);st.roomMsg=before+' '+st.roomMsg}
     return;
   }
   if(st.script===1){st.script=2;
     st.room={era:'present',name:'Market Square',desc:'Stalls frozen mid-sale. A dropped apple hangs in the air. Something moves beneath the market awning.',doors:{},entry:OPP[dir],type:'fight',insp:0};
-    DIRS.filter(d=>d!==OPP[dir]).slice(0,2).forEach(d=>st.room.doors[d]={});
+    DIRS.filter(d=>d!==OPP[dir]).slice(0,2).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
     log(st,'You step forward. The world shifts around you.');
     startFight(st,[FOES.present.find(f=>f.name==='Time-Torn Hound'),FOES.present.find(f=>f.name==='Clockwork Rat')],'reg');return}
   if(st.script===2){st.script=0;
     st.room={era:'present',name:'Fountain Court',desc:'The water stands still in a glass arc. A bird hangs motionless above the fountain. For a moment, you think you see someone standing on the opposite side.',doors:{},entry:OPP[dir],type:'quiet',insp:0};
-    DIRS.filter(d=>d!==OPP[dir]).sort(()=>Math.random()-.5).slice(0,rnd(2,3)).forEach(d=>st.room.doors[d]={});
+    DIRS.filter(d=>d!==OPP[dir]).sort(()=>Math.random()-.5).slice(0,rnd(2,3)).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
     st.roomMsg='';return}
   const r=makeRoom(st,OPP[dir]);st.room=r;st.roomMsg='';
   const due=BOSSES.find(b=>st.survival>=b.at*T(st)/1800&&!st.bossesDone.includes(b.at));
   if(due){r.type='boss';r.era=due.era;r.name=due.room;r.desc='Something old has been waiting for you.';startFight(st,[due],'boss');return}
   const m=minutes(st);
-  const type=tickets([['fight',48],['elite',m>=3?7:0],['treasure',12],['shrine',7],['quiet',26]]);
+  const type=door.type||rollType(st);
   r.type=type;
   if(type==='fight'){
     const count=Math.min(st.party.length+1,1+(Math.random()<.5)+(m>8&&Math.random()<.4)+(m>18&&Math.random()<.3));
     startFight(st,Array.from({length:count},()=>pick(FOES[r.era])),'reg');
   }else if(type==='elite'){
     startFight(st,[ELITES[r.era]].concat(m>12&&Math.random()<.5?[pick(FOES[r.era])]:[]),'elite');
-  }else if(type==='treasure'){
-    const g=Math.round(rnd(CFG.dTreasMin,CFG.dTreasMax)*partyBonus(st)*timeMult(st));
+  }else if(type==='treasure'){treasureRoom(st);st.relicNext=true
+  }else if(type==='shrine'){
+    st.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.4))});st.relicNext=true;
+    st.roomMsg='A quiet shrine. The living rest and recover 40% of their health.';
+  }else st.roomMsg='Nothing here but the sound of a clock that is not there.';
+}
+function treasureRoom(st){
+  {const g=Math.round(rnd(CFG.dTreasMin,CFG.dTreasMax)*partyBonus(st)*timeMult(st));
     st.timeLeft+=g;st.delta=g;st.stats.earnTreasure+=g;
     const extra=[];
     {const gg=gainGold(st,rnd(5,10)*partyBonus(st));extra.push(gg+' gold')}
     if(Math.random()<.3&&addPotion(st,1))extra.push('a potion')
-    if(Math.random()*100<CFG.dropTreasure){const it=makeItem(Math.round(avgLvl(st))+rnd(-1,2));st.bag.push(it);st.stats.items++;extra.push(it.name)}
-    st.roomMsg=`A cache of time shards: +${g}s${extra.length?', plus '+extra.join(' and '):''}.`;
-  }else if(type==='shrine'){
-    st.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.4))});
-    st.roomMsg='A quiet shrine. The living rest and recover 40% of their health.';
-  }else st.roomMsg='Nothing here but the sound of a clock that is not there.';
+    if(Math.random()*100<CFG.dropTreasure+(TF().drop||0)+loneMult(st)){const it=makeItem(Math.round(avgLvl(st))+rnd(-1,2));st.bag.push(it);st.stats.items++;extra.push(it.name)}
+    st.roomMsg=`A cache of time shards: +${g}s${extra.length?', plus '+extra.join(' and '):''}.`;}
 }
 function scaleFoe(st,base,tier){
   const m=minutes(st),L=avgLvl(st)-1;
@@ -525,20 +598,29 @@ function scaleFoe(st,base,tier){
 }
 function startFight(st,bases,kind){
   st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;return f});
-  st.phase='combat';st.fight={spent:0,kind};st.stats.fights++;
+  const tf=TF();st.phase='combat';st.fight={spent:0,kind,relic:!!(tf.relic&&st.relicNext),free:!!(tf.archivist&&!st.firstFightDone)};st.relicNext=false;st.firstFightDone=true;st.snap=null;st.stats.fights++;
   st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
   st.turn=st.party.findIndex(p=>!p.down);
   log(st,`${st.enemies.map(e=>e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
 function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);if(f.hp===0){log(st,`${f.name} falls.`);st.stats.kills++}}
 // pct: % of weapon damage. Hits always land unless the foe dodges. Returns damage dealt.
-function strike(st,a,f,pct,verb,critBonus){
+function strike(st,a,f,pct,verb,critBonus,critDBonus){
   if(Math.random()*100<f.dodge){log(st,`${f.name} dodges ${a.name}.`);bfx({k:'miss',a,f,txt:'dodge'});return 0}
-  const b=a.buff||{};
-  let d=rnd(a.dmgMin,a.dmgMax)*(1+(a.dmgPct+(b.dmg||0)+((st.buffs&&st.buffs.dmg)||0))/100)*pct/100;
-  const crit=Math.random()*100<a.critC+(b.crit||0)+(critBonus||0);if(crit)d*=a.critD/100;
-  d=Math.max(1,Math.round(d*(1-armCut(f.arm,a.lvl))));
-  log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});return d;
+  const b=a.buff||{},tf=TF(),isH=a.key==='hero';
+  let bonus=a.dmgPct+(b.dmg||0)+((st.buffs&&st.buffs.dmg)||0);
+  if(tf.lastGrains&&st.timeLeft<60)bonus+=25;
+  if(isH&&tf.exec&&f.hp<f.maxHp*.25)bonus+=20;
+  let d=rnd(a.dmgMin,a.dmgMax)*(1+bonus/100)*pct/100;
+  const crit=Math.random()*100<a.critC+(b.crit||0)+(critBonus||0);if(crit)d*=(a.critD+(critDBonus||0))/100;
+  const arm=isH?Math.max(0,f.arm-(tf.sunder||0)):f.arm;
+  d=Math.max(1,Math.round(d*(1-armCut(arm,a.lvl))));
+  log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});
+  if(isH&&f.hp===0){
+    if(tf.chain){const o=st.enemies.filter(x=>x.hp>0);if(o.length){const t=pick(o),sd=Math.max(1,Math.round(d*.3));log(st,`The blow carries on into ${t.name} for ${sd}.`);hitFoe(st,t,sd);bfx({k:'hit',a,f:t,d:sd})}}
+    if(tf.survivor){const h=Math.max(1,Math.round(a.maxHp*.05));a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}
+  }
+  return d;
 }
 // healing power comes from the healer's own weapon damage, so healers get better by gearing up. Healing past full is wasted.
 function healPower(a,pct){let h=rnd(a.dmgMin,a.dmgMax)*(1+a.dmgPct/100)*pct/100;const crit=Math.random()*100<a.critC;if(crit)h*=a.critD/100;return {h:Math.max(1,Math.round(h)),crit}}
@@ -550,6 +632,7 @@ function canUse(st,act){
   if(act==='potion')return st.items.potion>0&&st.party.some(p=>!p.down&&p.hp<p.maxHp);
   if(act==='phoenix')return st.items.phoenix>0&&st.party.some(p=>p.down);
   if(act==='stopwatch')return (st.items.stopwatch||0)>0&&!st.freeNext;
+  if(act==='rturn')return !!st.snap&&!(st.fight&&st.fight.rewound);
   if(act==='smoke')return (st.items.smoke||0)>0&&!(st.fight&&st.fight.kind==='boss');
   const m=st.party[st.turn];
   if(act==='lily')return !!m&&(m.lilies||0)>0;
@@ -566,9 +649,17 @@ function act(st,act,ti){
   if(!canUse(st,act))return;
   let c=costOf(a,act);const live=()=>st.enemies.filter(f=>f.hp>0);
   if(st.freeNext&&act!=='stopwatch'){c=0;st.freeNext=false}
+  const HS=['bolt','rewind','slow','rturn'];
+  if(a.key==='hero'&&st.artificer&&HS.includes(act)){c=Math.round(c*5)/10;st.artificer=false}
+  if(st.fight&&st.fight.free)c=0;
   switch(act){
     case 'attack':strike(st,a,foe,100);if(CLASSES[a.key].twice&&foe.hp>0)strike(st,a,foe,100);break;
-    case 'bolt':strike(st,a,foe,280,'blasts');break;
+    case 'bolt':{const tf=TF();const pct=280*(1+((tf.boltDmg||0)+(tf.heroSkill||0))/100);strike(st,a,foe,pct,'blasts',0,tf.boltCritD||0);
+      if(tf.echoBolt&&Math.random()<.25){const o=st.enemies.filter(x=>x.hp>0&&x!==foe);if(o.length)strike(st,a,pick(o),pct/2,'echoes into')}
+      if(tf.artificer&&foe.hp===0)st.artificer=true;break}
+    case 'slow':foe.slowed=true;bfx({k:'buff',a,t:a,txt:'slow'});log(st,`${a.name} slows ${foe.name}. Its next attack will be weaker.`);break;
+    case 'rturn':{st.fight.rewound=true;const sn=st.snap;st.party.forEach((p,i)=>{if(!sn[i])return;p.hp=sn[i].hp;p.down=sn[i].down;if(!p.down)p.downAt=null});st.snap=null;
+      bfx({k:'buff',a,txt:'rewind'});log(st,`${a.name} turns the moment back. The last round never happened.`);break}
     case 'smite':{const d=strike(st,a,foe,230,'smites');if(d){const h=Math.ceil(d*.3);a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}break}
     case 'backstab':strike(st,a,foe,300,'backstabs',30);break;
     case 'firebolt':live().forEach(f=>strike(st,a,f,160,'burns'));break;
@@ -581,11 +672,11 @@ function act(st,act,ti){
     case 'holy':if(strike(st,a,foe,160,'smites')>0&&(a.lilies||0)<3){a.lilies=(a.lilies||0)+1;log(st,`A Lily blooms for ${a.name} (${a.lilies}/3).`)}break;
     case 'lily':a.lilies--;heal(st,a,ally,180,'mends');a.lilyUsed=(a.lilyUsed||0)+1;if(a.lilyUsed>=3){a.lilyUsed=0;a.blood=true;bfx({k:'buff',a,txt:'blood lily'});log(st,`A Blood Lily blooms. ${a.name} can cast Misery.`)}break;
     case 'misery':a.blood=false;live().forEach(f=>strike(st,a,f,300,'devastates'));break;
-    case 'rewind':ally.regen={pct:90,rounds:3,from:a};bfx({k:'buff',a,t:ally,txt:'rewind'});log(st,`${a.name} rewinds ${ally.name===a.name?'their own':ally.name+"'s"} wounds. They will heal over the next 3 rounds.`);break;
-    case 'stopwatch':st.items.stopwatch--;st.freeNext=true;bfx({k:'buff',a,txt:'time stops'});log(st,`${a.name} clicks the Stopwatch. The next action costs no time.`);break;
+    case 'rewind':{const tf=TF();ally.regen={pct:90*(1+((tf.rewindHeal||0)+(tf.heroSkill||0))/100),rounds:3+(tf.rewindRounds||0),from:a}};bfx({k:'buff',a,t:ally,txt:'rewind'});log(st,`${a.name} rewinds ${ally.name===a.name?'their own':ally.name+"'s"} wounds. They will heal over the next 3 rounds.`);break;
+    case 'stopwatch':st.items.stopwatch--;st.freeNext=true;if(TF().artificer)st.artificer=true;bfx({k:'buff',a,txt:'time stops'});log(st,`${a.name} clicks the Stopwatch. The next action costs no time.`);break;
     case 'smoke':{st.items.smoke--;spend(st,c,'act');if(st.phase==='end')return;st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
       st.enemies=[];st.fight=null;st.phase='room';st.roomMsg='Smoke fills the room. When it clears, you are somewhere safe. No rewards, but you live.';log(st,'The party escapes in a cloud of smoke.');return}
-    case 'potion':{st.items.potion--;const h=Math.round(ally.maxHp*.4)+4;ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
+    case 'potion':{st.items.potion--;const h=Math.round((Math.round(ally.maxHp*.4)+4)*(1+(TF().potionHeal||0)/100));ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
     case 'phoenix':st.items.phoenix--;ally.down=false;ally.hp=Math.ceil(ally.maxHp*.4);bfx({k:'heal',a,t:ally,h:ally.hp,rev:1});log(st,`A Phoenix Down brings ${ally.name} back.`);break;
   }
   if(!spend(st,c,'act'))return;
@@ -601,6 +692,7 @@ function advance(st){
   st.turn=i;startTurn(st,i);
 }
 function enemyPhase(st){
+  st.snap=st.party.map(p=>({hp:p.hp,down:p.down}));
   for(const f of st.enemies){
     if(f.hp<=0)continue;
     for(let k=0;k<f.attacks;k++){
@@ -609,35 +701,35 @@ function enemyPhase(st){
       const t=taunter||pick(live);
       if(Math.random()*100<t.dodge){log(st,`${t.name} dodges ${f.name}.`);bfx({k:'emiss',f,t,txt:'dodge'});continue}
       let dmg=rnd(f.dmg[0],f.dmg[1]);const crit=Math.random()<.05;if(crit)dmg*=1.5;
-      dmg*=1-armCut(t.arm+((st.buffs&&st.buffs.arm)||0),f.lvl);if(t.defending)dmg*=1-CFG.defendCut/100;dmg=Math.max(1,Math.round(dmg));
+      dmg*=1-armCut(t.arm+((st.buffs&&st.buffs.arm)||0),f.lvl);if(t.defending)dmg*=Math.max(.1,1-(CFG.defendCut+(t.key==='hero'?(TF().defend||0):0))/100);if(f.slowed){dmg*=.5;f.slowed=false}if(st.fight&&st.fight.relic)dmg*=.8;dmg=Math.max(1,Math.round(dmg));
       t.hp=Math.max(0,t.hp-dmg);log(st,`${f.name} ${crit?'crits':'hits'} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit});
       if(t.hp===0)fall(st,t,f.tier);
     }
   }
   if(st.party.every(p=>p.down))end(st,'wipe');
 }
-function fall(st,m,cause){m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.regen=null;m.downAt={name:st.room.name,era:st.room.era,cause};log(st,`${m.name} is down!`)}
-function timeMult(st){return 1+Math.min(100,st.party.filter(p=>!p.down).reduce((a,p)=>a+(p.timePct||0),0))/100}
+function fall(st,m,cause){if(m.key==='hero'&&TF().unbroken&&!st.unbrokenUsed){st.unbrokenUsed=true;m.hp=1;bfx({k:'buff',a:m,txt:'unbroken'});log(st,`${m.name} refuses to fall. Unbroken.`);return}m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.regen=null;m.downAt={name:st.room.name,era:st.room.era,cause};log(st,`${m.name} is down!`)}
+function timeMult(st){return 1+Math.max(-50,Math.min(100,st.party.filter(p=>!p.down).reduce((a,p)=>a+(p.timePct||0),0)))/100}
 function winFight(st){
   let earned=0,xp=0,drops=[],cry=0;
   const L=Math.round(avgLvl(st));
   for(const f of st.enemies){
     const [lo,hi]=f.tier==='boss'?[CFG.dBossMin,CFG.dBossMax]:f.tier==='elite'?[CFG.dEliteMin,CFG.dEliteMax]:[CFG.dRegMin,CFG.dRegMax];
-    earned+=rnd(lo,hi);xp+=f.xp;
+    earned+=rnd(lo,hi)*(f.tier==='boss'&&TF().archivist?1.25:1);xp+=f.xp;
     if(f.tier==='boss'){drops.push(makeItem(L+rnd(0,2),'rare'),makeItem(L+rnd(0,2),'uncommon'));cry+=rnd(2,3)}
     else if(f.tier==='elite'){drops.push(makeItem(L+rnd(0,2),'uncommon'));if(Math.random()<.5)cry+=1}
-    else if(Math.random()*100<CFG.dropReg)drops.push(makeItem(L+rnd(-2,2)));
+    else if(Math.random()*100<CFG.dropReg+(TF().drop||0)+loneMult(st))drops.push(makeItem(L+rnd(-2,2)));
   }
   if(Math.random()*100<CFG.crystalReg)cry+=1;
   let gold=0;for(const f of st.enemies){const [lo,hi]=f.tier==='boss'?[25,40]:f.tier==='elite'?[8,12]:[1,3];gold+=rnd(lo,hi)}
   const b=partyBonus(st);gold=gainGold(st,gold*b*(1+.06*(L-1)));earned=Math.round(earned*b*timeMult(st));xp=Math.round(xp*b);
-  st.timeLeft+=earned;st.delta=earned;st.stats.earnFoes+=earned;st.crystals+=cry;
+  if(TF().linger&&!st.party.some(p=>p.down))earned+=3;st.timeLeft+=earned;st.delta=earned;st.stats.earnFoes+=earned;st.crystals+=cry;
   drops.forEach(d=>st.bag.push(d));st.stats.items+=drops.length;
   if(st.fight.kind==='boss')st.bossesDone.push(st.enemies[0].bossAt);
   const ups=[];
-  st.party.forEach(m=>{if(m.down)return;m.xp+=xp;let up=false;while(m.xp>=nextXp(m.lvl)){m.xp-=nextXp(m.lvl);m.lvl++;up=true}
+  st.party.forEach(m=>{if(m.down)return;const tf=TF();m.xp+=Math.round(xp*(1+((m.key==='hero'?tf.heroXp:tf.compXp)||0)/100));let up=false;while(m.xp>=nextXp(m.lvl)){m.xp-=nextXp(m.lvl);m.lvl++;up=true}
     if(up){refresh(m);m.hp=Math.min(m.maxHp,m.hp+CLASSES[m.key].grow);ups.push(`${m.name} → Lv ${m.lvl}`);
-      const sk=CLASSES[m.key].skills.find(s=>s.lvl===m.lvl);if(sk)ups.push(`${m.name} learned ${sk.name}!`)}});
+      const sk=CLASSES[m.key].skills.find(s=>s.lvl===m.lvl);if(sk)ups.push(`${m.name} learned ${sk.name}!`);if(m.key==='hero')ups.push('+1 skill point for the hero\'s tree')}});
   const net=earned-st.fight.spent,s=st.stats;
   if(s.best===null||net>s.best)s.best=net;if(s.worst===null||net<s.worst)s.worst=net;
   st.sum={gold,over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry};
@@ -664,11 +756,15 @@ function unequip(st,mi,slot){const m=st.party[mi];if(!m.gear[slot])return;st.bag
 function applyReset(){
   const st=S,ev=[];const kind=st.result.kind;
   ev.push({type:'result',kind,survival:st.survival,target:T(st),crystals:st.crystals,gold:st.gold||0});
-  M.crystals+=st.crystals;ensureEconomy();M.gold+=st.gold||0;
+  M.crystals+=Math.round(st.crystals*(1+(TF().cry||0)/100));ensureEconomy();
+  const tfR=TF();let beyondUsed=false;M.gold+=st.gold||0;
   for(const m of st.party){
     const c=M.chars.find(x=>x.id===m.id);if(!c)continue;
     const kept={};for(const sl in m.gear)if(m.gear[sl].soul)kept[sl]=m.gear[sl];
+    if(m.key==='hero'&&tfR.anchor){const cand=Object.entries(m.gear).filter(([,it])=>!it.soul);const pickA=cand.find(([,it])=>it.id===st.anchorId)||cand.sort((x,y)=>power(y[1].stats)-power(x[1].stats))[0];
+      if(pickA){kept[pickA[0]]=pickA[1];ev.push({type:'anchor',name:pickA[1].name})}}
     const lostGear=Object.values(m.gear).filter(it=>!it.soul).length;
+    if(m.down&&m.key!=='hero'&&tfR.beyond&&!beyondUsed){beyondUsed=true;m.down=false;ev.push({type:'beyond',name:m.name})}
     if(m.down&&m.key!=='hero'){
       // gone. The loop takes them.
       const together=M.loop-c.joinLoop+1;
@@ -700,7 +796,7 @@ function applyReset(){
   M.fallen=M.fallen.filter(f=>!(f.returnAt!==null&&f.returnAt<=M.loop));
   M.tavern=rollTavern();
   back.forEach(f=>{
-    const r={id:uid(),key:f.key,lvl:1,stranger:{realName:f.realName,mem:0,need:Math.max(1,Math.ceil(f.deathLoop/2)),deathLoop:f.deathLoop,landmark:f.landmark,cause:f.cause},name:randName(),colour:f.colour};
+    const r={id:uid(),key:f.key,lvl:1,stranger:{realName:f.realName,mem:0,need:Math.max(1,Math.ceil(f.deathLoop/2)-(TF().echoBond||0)),deathLoop:f.deathLoop,landmark:f.landmark,cause:f.cause},name:randName(),colour:f.colour};
     const i=M.tavern.findIndex(x=>!x.stranger&&x.key===f.key);M.tavern.splice(i>=0?i:0,i>=0?1:0,r);
     ev.push({type:'stranger',cls:CLASSES[f.key].cls});
   });
@@ -1132,7 +1228,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.4.0';
+const GAME_VERSION='0.5.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1363,6 +1459,7 @@ function renderTown(){
     ${townMapHTML()}
     <p class="small" style="text-align:center;margin:0">Tap a place on the map.</p>
     <div class="chips">${pm.map(c=>`<span class="chip"><b style="color:${c.key==='hero'||c.stranger?'inherit':c.colour}">${esc(c.name)}</b> ${CLASSES[c.key].cls} ${c.lvl}</span>`).join('')}</div>
+    <button class="btn" data-a="tree">Skill tree${pointsFree()>0?` · <b style="color:var(--brass)">${pointsFree()} point${pointsFree()>1?'s':''} to spend</b>`:''}</button>
     <button class="btn primary" data-place="gate">Enter the dungeon</button>
     <div class="row"><button class="btn ghost" data-a="menu">Main menu</button>${SET.tools?'<button class="btn ghost" data-a="tune">Tuning and test tools</button>':''}</div>${foot()}</section>`;
   if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
@@ -1390,6 +1487,78 @@ function sanctumSheet(){
     <p class="small">Upgrades are permanent and survive every reset. Each rank costs more than the last.</p>
     <div class="row"><button class="btn" data-a="wizback">Talk to the wizard</button><button class="btn primary" data-a="close">Leave</button></div>`;
 }
+const MARKET=['potion','phoenix','stopwatch','smoke'];
+function marketSheet(){
+  const purse=(S.gold||0)+(M.gold||0);
+  return `<div class="eyebrow">The Market Square · time resumes</div><h2>The market wakes</h2>
+    <p class="desc">The apple drops. A trader blinks, looks at you, and carries on mid-sentence as if nothing happened. You have a moment before the loop takes hold again.</p>
+    <div class="turnline"><span class="small">Gold: <b style="color:var(--brass)">${purse}</b></span><span class="small">Potions ${S.items.potion}/${potionCap()}</span></div>
+    <div class="events">${MARKET.map(k=>{const d=STORE.find(x=>x[0]===k),p=priceOf(k),left=S.market[k]||0,capped=k==='potion'&&S.items.potion>=potionCap();
+      return `<div class="item"><span class="nm">${d[1]}</span><span class="st">${d[4]}</span><span class="st">${left} on the stall</span>
+      <button class="btn" data-mbuy="${k}" ${purse<p||!left||capped?'disabled':''} style="min-height:40px">${capped?'Carry limit reached':`Buy · ${p} gold`}</button></div>`}).join('')}</div>
+    <p class="small">Items go straight into your pack for this run. Gold from this run is spent first, then your purse.</p>
+    <button class="btn primary" data-a="close">Leave the market</button>`;
+}
+function marketBuy(k){const p=priceOf(k);if(!(S.market[k]>0))return;if((S.gold||0)+(M.gold||0)<p)return;if(k==='potion'&&S.items.potion>=potionCap())return;
+  const a=Math.min(S.gold||0,p);S.gold-=a;M.gold-=p-a;S.market[k]--;S.items[k]=(S.items[k]||0)+1}
+// the spider's web: six spokes, a node every few steps out, faint rings between them like a web
+const TW={r0:58,step:39};
+function nodePos(n){if(n.type==='hybrid'){const ia=BRANCHES.findIndex(b=>b[0]===n.a),ib=BRANCHES.findIndex(b=>b[0]===n.b);
+    let a1=-90+ia*60,a2=-90+ib*60;if(Math.abs(a2-a1)>180)a2+=a2<a1?360:-360;const ang=(a1+a2)/2*Math.PI/180,r=TW.r0+TW.step*5.6;return [Math.cos(ang)*r,Math.sin(ang)*r]}
+  const i=BRANCHES.findIndex(b=>b[0]===n.br),ang=(-90+i*60)*Math.PI/180,r=TW.r0+TW.step*n.n;return [Math.cos(ang)*r,Math.sin(ang)*r]}
+function treeSVG(){
+  const own=treeOwned(),sel=UI.treeSel;let g='';
+  // web rings
+  for(let k=1;k<=10;k++){const r=TW.r0+TW.step*k,pts=BRANCHES.map((b,i)=>{const a=(-90+i*60)*Math.PI/180;return (Math.cos(a)*r).toFixed(1)+','+(Math.sin(a)*r).toFixed(1)}).join(' ');
+    g+=`<polygon points="${pts}" fill="none" stroke="#3a3548" stroke-width="${k%5===0?1.6:.8}" opacity="${k%5===0?.9:.55}"/>`}
+  // spokes and links
+  BRANCHES.forEach(([b,name,col],i)=>{const a=(-90+i*60)*Math.PI/180,R=TW.r0+TW.step*11.8;
+    g+=`<line x1="0" y1="0" x2="${(Math.cos(a)*(TW.r0+TW.step*10)).toFixed(1)}" y2="${(Math.sin(a)*(TW.r0+TW.step*10)).toFixed(1)}" stroke="#4a4458" stroke-width="2"/>`;
+    for(let n=1;n<=10;n++){const id=b+'_'+String(n).padStart(2,'0');if(!own.includes(id))continue;const [x2,y2]=nodePos(TREE[id]);const [x1,y1]=n===1?[0,0]:nodePos(TREE[b+'_'+String(n-1).padStart(2,'0')]);
+      g+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="4" stroke-linecap="round"/>`}
+    g+=`<text x="${(Math.cos(a)*R).toFixed(1)}" y="${(Math.sin(a)*R+5).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="700" fill="${col}">${name}</text>`});
+  HYBRIDS.forEach(h=>{const n=TREE['hy_'+h[0]],[x,y]=nodePos(n);[n.a,n.b].forEach(b=>{const [x1,y1]=nodePos(TREE[b+'_05']);
+    g+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${own.includes(n.id)?'#e0ae52':'#4a4458'}" stroke-width="${own.includes(n.id)?3:1.5}" stroke-dasharray="${own.includes(n.id)?'':'5 5'}"/>`})});
+  // nodes
+  for(const id in TREE){const n=TREE[id],[x,y]=nodePos(n),st=treeState(id),owned=st==='owned',open=st==='open';
+    const col=n.type==='hybrid'?'#e0ae52':B_COL[n.br],r={minor:9,passive:13,skill:13,milestone:13,keystone:14,capstone:19,hybrid:15}[n.type];
+    const fill=owned?col:'#1d1a26',stroke=owned?'#fff':open?col:'#4f4a5c',sw=id===sel?4:open?3:2,op=owned||open?1:.6;
+    const shape=n.type==='keystone'||n.type==='hybrid'?`<rect x="${-r}" y="${-r}" width="${2*r}" height="${2*r}" transform="rotate(45)" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+      :`<circle r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>${n.type==='capstone'?`<circle r="${r+6}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".8"/>`:''}`;
+    g+=`<g class="tnode" data-node="${id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" opacity="${op}" style="cursor:pointer">${open?`<circle r="${r+9}" fill="${col}" opacity=".18"/>`:''}${shape}<circle r="${r+10}" fill="transparent"/></g>`}
+  g+=`<g transform="translate(0,0)"><circle r="26" fill="#2a2536" stroke="#e0ae52" stroke-width="3"/><text y="5" text-anchor="middle" font-size="13" fill="#e0ae52" font-weight="700">✦</text></g>`;
+  const z=UI.tz||(UI.tz={x:0,y:0,k:.62});
+  return `<div class="treewrap" id="treewrap" style="position:relative;touch-action:none;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#141219;height:min(62vh,440px)">
+    <svg id="treesvg" viewBox="-300 -300 600 600" width="100%" height="100%" style="display:block;font-family:inherit"><g id="treeg" transform="translate(${z.x},${z.y}) scale(${z.k})">${g}</g></svg>
+    <div style="position:absolute;right:8px;top:8px;display:grid;gap:6px"><button class="btn" data-tz="in" style="min-height:36px;padding:4px 12px">+</button><button class="btn" data-tz="out" style="min-height:36px;padding:4px 12px">−</button><button class="btn" data-tz="home" style="min-height:36px;padding:4px 8px;font-size:12px">⌂</button></div></div>`;
+}
+function treeSheet(){
+  const n=UI.treeSel&&TREE[UI.treeSel];let det='<p class="small">Drag to move around the web, pinch or use + and − to zoom, and tap a node to see it.</p>';
+  if(n){const st=treeState(n.id);const where=n.type==='hybrid'?`${B_NAME[n.a]} + ${B_NAME[n.b]}`:`${B_NAME[n.br]} · node ${n.n}`;
+    det=`<div class="item ${st==='owned'?'soul':''}"><span class="nm" style="color:${n.type==='hybrid'?'#e0ae52':B_COL[n.br]}">${esc(n.name)}</span><span class="st">${n.type==='hybrid'?'Hybrid keystone':n.type.charAt(0).toUpperCase()+n.type.slice(1)} · ${where}</span>
+      <span class="desc" style="margin:0">${esc(n.desc)}</span>
+      ${st==='owned'?'<span class="small">Learned.</span>':st==='open'?`<button class="btn primary" data-tbuy="${n.id}" style="min-height:40px">Learn · 1 skill point</button>`:`<span class="small">${esc(st.why)}</span>`}</div>`}
+  const rc=respecCost();
+  return `<div class="eyebrow">${esc(hero().name)} · the Fixed Point</div><div class="turnline"><h2>Skill tree</h2><span class="small"><b style="color:var(--brass)">${pointsFree()}</b> point${pointsFree()===1?'':'s'} to spend · ${treeOwned().length} learned</span></div>
+    ${treeSVG()}${det}
+    <p class="small">You earn 1 point per hero level, plus a bonus point at loops 5, 10, 15, 20 and 30. Passives need 3 points in their discipline, keystones 6, capstones 9, and hybrids 5 in both neighbours.</p>
+    <div class="row"><button class="btn" data-a="respec" ${!treeOwned().length||M.crystals<rc?'disabled':''}>Reset tree · ${rc?rc+' crystals':'free once'}</button><button class="btn primary" data-a="close">Done</button></div>`;
+}
+function initTree(){
+  const wrap=document.getElementById('treewrap'),g=document.getElementById('treeg'),svg=document.getElementById('treesvg');if(!wrap)return;
+  const z=UI.tz;const apply=()=>g.setAttribute('transform',`translate(${z.x},${z.y}) scale(${z.k})`);
+  const scale=()=>600/Math.min(svg.clientWidth,svg.clientHeight);
+  const pts=new Map();let last=null,moved=0,pinch=null;
+  wrap.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;wrap.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;
+    if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),k:z.k}}});
+  wrap.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId),dx=e.clientX-p.x,dy=e.clientY-p.y;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2&&pinch){const [a,b]=[...pts.values()];z.k=Math.max(.35,Math.min(2.5,pinch.k*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d));moved+=10;apply();return}
+    moved+=Math.abs(dx)+Math.abs(dy);const s=scale();z.x+=dx*s;z.y+=dy*s;apply()});
+  const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;
+    if(moved<8&&e.type==='pointerup'){const el=document.elementFromPoint(e.clientX,e.clientY),nd=el&&el.closest&&el.closest('[data-node]');if(nd){UI.treeSel=nd.dataset.node;render()}}};
+  wrap.addEventListener('pointerup',up);wrap.addEventListener('pointercancel',up);
+  wrap.addEventListener('wheel',e=>{e.preventDefault();z.k=Math.max(.35,Math.min(2.5,z.k*(e.deltaY<0?1.12:.89)));apply()},{passive:false});
+}
 function placeSheet(kind){
   if(kind==='wizard')return wizardSheet();
   if(kind==='tavern')return `<div class="eyebrow">The Tavern${M.freeHires>0?` · the keeper owes you ${M.freeHires} free hire${M.freeHires>1?'s':''}`:''}</div><h2>Looking for work</h2>
@@ -1407,6 +1576,8 @@ function placeSheet(kind){
     ${list.length?`<div class="events">${list.map(m=>`<div class="item ${m.recalled?'soul':''}"><span class="nm" style="color:${m.colour}">${esc(m.name)}${m.recalled?' ✦':''}</span><span class="st">${m.cls} · lost on loop ${m.loop}${m.recalled?' · came back and remembered':''}</span></div>`).join('')}</div>`:'<p class="desc">No names yet. Keep it that way if you can.</p>'}
     <button class="btn primary" data-a="close">Leave</button>`}
   if(kind==='shop')return storeSheet();
+  if(kind==='tree')return treeSheet();
+  if(kind==='market')return marketSheet();
   if(kind==='sanctum')return sanctumSheet();
   return '';
 }
@@ -1432,8 +1603,8 @@ function roomView(){
   const r=S.room;
   const doors=DIRS.map(d=>{
     const dr=r.doors[d];
-    if(dr&&dr.echo){const m=S.party.find(x=>x.id===dr.echo);return `<div class="cell ${d}"><button class="door echo" style="--echo:${m.colour}" data-door="${d}" aria-label="Distant Echo, costs ${CFG.cMove} seconds"><b>Distant<br>Echo</b><span class="cost">−${CFG.cMove}s</span></button></div>`}
-    if(dr)return `<div class="cell ${d}"><button class="door" data-door="${d}" title="The path is worn, but the stones beneath it are unfamiliar." aria-label="Unknown door, costs ${CFG.cMove} seconds"><b>?</b><span class="cost">−${CFG.cMove}s</span></button></div>`;
+    if(dr&&dr.echo){const m=S.party.find(x=>x.id===dr.echo);return `<div class="cell ${d}"><button class="door echo" style="--echo:${m.colour}" data-door="${d}" aria-label="Distant Echo, costs ${Math.max(1,CFG.cMove-(TF().doorCut||0))} seconds"><b>Distant<br>Echo</b><span class="cost">−${Math.max(1,CFG.cMove-(TF().doorCut||0))}s</span></button></div>`}
+    if(dr)return `<div class="cell ${d}"><button class="door" data-door="${d}" title="The path is worn, but the stones beneath it are unfamiliar." aria-label="${dr.hint?HINT[dr.type]:'Unknown'} door, costs ${Math.max(1,CFG.cMove-(TF().doorCut||0))} seconds"><b>${dr.hint?`<span style="font-size:11px">${HINT[dr.type]}</span>`:'?'}</b><span class="cost">−${Math.max(1,CFG.cMove-(TF().doorCut||0))}s</span></button></div>`;
     if(r.entry===d)return `<div class="cell ${d}"><div class="door came" aria-label="The way you came"><b>came</b></div></div>`;
     return '';
   }).join('');
@@ -1442,6 +1613,7 @@ function roomView(){
     <div class="roomhead"><h2>${esc(r.name)}</h2><span class="era ${r.era}">${r.era}</span></div>
     <p class="desc">${esc(r.desc)}</p>
     ${S.roomMsg?`<div class="note">${esc(S.roomMsg)}</div>`:''}
+    ${r.name==='Market Square'&&S.phase==='room'&&TF().market&&!S.marketUsed?`<button class="btn primary" data-a="market">Pull time to heel <span class="cost">once per run</span></button>`:''}
     ${INSPECT[r.name]&&S.phase==='room'?`<button class="btn" data-a="inspect">${INSPECT[r.name].label} <span class="cost">free</span></button>`:''}
     ${echoNote?`<div class="note" style="border-color:${S.party.find(x=>x.id===echoNote.echo).colour}">${esc(S.party.find(x=>x.id===echoNote.echo).name)} keeps glancing at one of the doors.</div>`:''}
     <div class="square">${doors}<div class="cell floor ${r.era}"><span class="eyebrow">Choose a door</span><span class="small">Every step costs time.<br>What lies behind is unknown.</span></div></div>
@@ -1456,7 +1628,7 @@ function fightView(){
   if(p){acts=`<div class="note">${{enemy:'Tap an enemy',ally:'Tap an ally in your party',downed:'Tap a fallen ally',sacrifice:'Tap a companion to sacrifice'}[pt]}.</div><button class="btn" data-a="cancel">Cancel</button>`}
   else{
     const btn=(k,label,locked)=>`<button class="btn" data-act="${k}" ${canUse(S,k)&&!locked?'':'disabled'}><span>${label}${SKILL_INFO[k]?`<span class="si">${SKILL_INFO[k]}</span>`:''}</span><span class="cost">−${secs(costOf(a,k))}</span></button>`;
-    const sk=CLASSES[a.key].skills.map(s=>a.lvl>=s.lvl?btn(s.key,s.name):`<button class="btn" disabled><span>${s.name}</span><span class="cost">Lv ${s.lvl}</span></button>`).join('');
+    const sk=skillsOf(a).map(s=>a.lvl>=s.lvl?btn(s.key,s.name):`<button class="btn" disabled><span>${s.name}</span><span class="cost">Lv ${s.lvl}</span></button>`).join('');
     acts=(M.flags&&!M.flags.tutorialDone?`<div class="note"><div class="eyebrow">Combat: your turn</div>Each action costs time. Skills cost more but hit much harder, so fights end sooner and you take fewer hits. Defeating enemies rewards you with time shards. Choose an action for your active character.</div>`:'')+`<div class="actions">${btn('attack',CLASSES[a.key].twice?'Attack ×2':'Attack')}${sk}${btn('defend','Defend')}${btn('potion',`Potion ×${S.items.potion}`)}${S.items.stopwatch?btn('stopwatch',`Stopwatch ×${S.items.stopwatch}`):''}${S.items.smoke?btn('smoke',`Smoke Bomb ×${S.items.smoke}`):''}${btn('phoenix',`Phoenix Down ×${S.items.phoenix}`)}</div>`;
   }
   return `<section class="room">
@@ -1529,10 +1701,11 @@ function renderSheet(){
   else if(kind==='events')h=eventsSheet();
   else if(kind==='abandon')h=`<h2>Abandon this run?</h2><p class="desc">It counts as running out of time: anyone who's down is lost, and only equipped soulbound gear is kept.</p>
     <div class="row"><button class="btn" data-a="close">Keep playing</button><button class="btn primary" data-a="abandonyes">Abandon</button></div>`;
-  else if(['wizard','tavern','party','gate','memorial','shop','sanctum'].includes(kind))h=placeSheet(kind);
+  else if(['wizard','tavern','party','gate','memorial','shop','sanctum','tree','market'].includes(kind))h=placeSheet(kind);
   else if(kind==='wipe')h=`<h2>Reset all progress?</h2><p class="desc">This deletes your hero, companions, crystals and loops on this device.</p>
     <div class="row"><button class="btn" data-a="settings">Back</button><button class="btn primary" data-a="wipeyes">Delete everything</button></div>`;
   sheet.hidden=false;sheet.innerHTML=`<div role="dialog">${h}</div>`;
+  if(kind==='tree')initTree();
 }
 function itemCard(it,extra){return `<div class="item ${it.soul?'soul':''}"><span class="nm r-${it.rarity}">${esc(it.name)}</span>
   <span class="st">${R_NAME[it.rarity]} ${SLOT_NAME[it.slot].toLowerCase()} · Lv ${it.lvl}${it.soul?' · <span class="sb">Soulbound</span>':''}</span><span class="st">${statLine(it.stats)}</span>${extra||''}</div>`}
@@ -1554,6 +1727,7 @@ function gearSheet(){
     const opts=inRun?S.bag.filter(i=>i.slot===UI.gearSlot).sort((a,b)=>power(b.stats)-power(a.stats)):[];
     detail=`<div class="eyebrow">${SLOT_NAME[UI.gearSlot]}${inRun?` · ${opts.length} in your bag`:''}</div>
       ${cur&&editable?`<button class="btn" data-uneq="${UI.gearSlot}">Unequip ${esc(cur.name)}</button>`:''}
+      ${cur&&selling&&m.key==='hero'&&TF().anchor&&!cur.soul?(S.anchorId===cur.id?'<span class="small">⚓ Anchored: this survives the reset.</span>':`<button class="btn" data-anchor="${cur.id}">⚓ Anchor ${esc(cur.name)} (keep it through the reset)</button>`):''}
       ${cur&&!inRun&&!cur.soul?`<button class="btn" data-bind="${UI.gearSlot}" ${M.crystals<bindCost(cur)?'disabled':''}>Bind ${esc(cur.name)} · ${bindCost(cur)} crystal${bindCost(cur)>1?'s':''}</button><span class="small">Binding makes it soulbound, so it survives every reset.</span>`:''}
       ${opts.map(it=>itemCard(it,`<div class="small">${deltaLine(it.stats,cur&&cur.stats)}</div>${editable?`<div class="row">${it.lvl>m.lvl?`<span class="small down">Needs Lv ${it.lvl}</span>`:`<button class="btn" data-eq="${it.id}" style="min-height:40px">Equip</button>`}${selling?`<button class="btn" data-sell="${it.id}" style="min-height:40px">Sell · ${sellValue(it)} gold</button>`:''}</div>`:''}`)).join('')||(inRun?'<span class="small">Nothing in your bag for this slot.</span>':'')}`;
   }
@@ -1583,6 +1757,8 @@ function eventsSheet(){
     if(e.type==='intro')return `<div class="note">You wake in a quiet hamlet that time forgot. You remember everything. Nobody else does.</div>`;
     if(e.type==='result')return `<div><div class="eyebrow">The loop resets${e.gold?` · +${e.gold} gold kept in your purse`:''}</div><h2>${{clear:'Run cleared',timeout:'Out of time',wipe:'Party wiped'}[e.kind]}</h2><div class="small">Survived ${fmt(e.survival)} of ${fmt(e.target)}${e.crystals?` · brought back ${e.crystals} crystal${e.crystals>1?'s':''}`:''}</div></div>`;
     if(e.type==='lost')return `<div class="note" style="border-color:var(--bad)"><b>${esc(e.name)}</b> the ${e.cls.toLowerCase()} is gone. The loop took them.</div>`;
+    if(e.type==='beyond')return `<div class="note"><b>${esc(e.name)}</b> was down when the loop reset, but your memory held them. Beyond the Loop kept them with you.</div>`;
+    if(e.type==='anchor')return `<div class="small">Anchor kept <b>${esc(e.name)}</b>.</div>`;
     if(e.type==='gear')return `<div class="small"><b>${esc(e.name)}</b>: ${e.kept.length?'kept '+e.kept.map(esc).join(', '):'kept nothing'}${e.lost?`; ${e.lost} item${e.lost>1?'s':''} turned to dust`:''}.</div>`;
     if(e.type==='stranger')return `<div class="note">There's a new ${e.cls.toLowerCase()} at the tavern. They look... familiar.</div>`;
     if(e.type==='recall')return `<div class="namefade"><span class="eyebrow">A memory returns</span><span class="old">${esc(e.from)}</span><span class="new">${esc(e.to)}</span>
@@ -1596,7 +1772,7 @@ function tuneSheet(){
     <p class="desc">Changes apply straight away and are remembered on this device.</p>
     <form class="tune" id="tuneform">${TUNE.map(([g,rows])=>`<fieldset><legend>${g}</legend>${rows.map(([k,l])=>`<label for="t-${k}"><span>${l}</span><input id="t-${k}" name="${k}" type="number" step="any" min="0" value="${CFG[k]}"></label>`).join('')}</fieldset>`).join('')}</form>
     ${M?`<fieldset class="tune" style="border:1px dashed var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px"><legend style="color:var(--brass);font-size:13px;text-transform:uppercase;letter-spacing:.1em">Test tools</legend>
-      <button class="btn" data-a="givecry">Add 5 crystals</button><button class="btn" data-a="givegold">Add 100 gold</button><button class="btn" data-a="wipe">Reset all progress</button></fieldset>`:''}
+      <button class="btn" data-a="givecry">Add 5 crystals</button><button class="btn" data-a="givegold">Add 100 gold</button><button class="btn" data-a="givepts">Hero +1 level</button><button class="btn" data-a="wipe">Reset all progress</button></fieldset>`:''}
     <div class="row"><button class="btn" data-a="tunereset">Reset numbers</button><button class="btn primary" data-a="close">Done</button></div>`;
 }
 
@@ -1629,6 +1805,10 @@ document.addEventListener('click',e=>{
   if(d.gs){UI.gearSlot=UI.gearSlot===d.gs?null:d.gs;render();return}
   if(d.eq){equip(S,UI.gearChar,d.eq);save();render();return}
   if(d.uneq){unequip(S,UI.gearChar,d.uneq);save();render();return}
+  if(d.tbuy){treeBuy(d.tbuy);SFX.buff();save();render();return}
+  if(d.tz){const z=UI.tz;if(d.tz==='home'){z.x=0;z.y=0;z.k=.62}else z.k=Math.max(.35,Math.min(2.5,z.k*(d.tz==='in'?1.25:.8)));render();return}
+  if(d.mbuy){marketBuy(d.mbuy);SFX.buff();save();render();return}
+  if(d.anchor){S.anchorId=d.anchor;save();render();return}
   if(d.sell){sellItem(S,d.sell);SFX.buff();save();render();return}
   if(d.buy){buy(d.buy);SFX.buff();save();render();return}
   if(d.sanc){buySanctum(d.sanc);SFX.buff();save();render();return}
@@ -1655,8 +1835,12 @@ document.addEventListener('click',e=>{
     case 'tune':UI.sheet='tune';render();break;
     case 'tunereset':CFG=Object.assign({},DEFAULTS);store.set('t2r-tune2',CFG);render();break;
     case 'givecry':M.crystals+=5;save();render();break;
+    case 'givepts':hero().lvl++;save();render();break;
     case 'givegold':ensureEconomy();M.gold+=100;save();render();break;
     case 'sanctum':UI.sheet='sanctum';render();break;
+    case 'tree':UI.sheet='tree';render();break;
+    case 'respec':treeRespec();UI.treeSel=null;save();render();break;
+    case 'market':if(!S.marketUsed&&TF().market){S.marketUsed=true;S.market={potion:2,phoenix:1,stopwatch:1,smoke:1};S.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.25))});UI.sheet='market';S.roomMsg='Time runs properly here, for a moment. The party feels rested.';save()}render();break;
     case 'wizback':UI.sheet='wizard';UI.wizN=null;render();break;
     case 'sellall':S.bag.slice().forEach(it=>sellItem(S,it.id));SFX.buff();save();render();break;
     case 'wipe':UI.sheet='wipe';render();break;
@@ -1755,7 +1939,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.4.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.5.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
