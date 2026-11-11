@@ -772,11 +772,11 @@ const P_HAIR=['#e8d27a','#7a4a2a','#2a2030','#c0603a','#d8d8e0','#5a3a6a'],P_SKI
 const P_ACC=['#e0ae52','#c8ccd8','#e39ac7','#8fd3d0','#f0c27a'],P_ARM=['#7a8090','#8a8f9a','#5a6070'];
 const P_GLOW={hero:'#e0ae52',cleric:'#f2e6a0',mage:'#8fd3d0'};
 function hashStr(s){let h=7;for(const ch of String(s))h=(h*31+ch.charCodeAt(0))>>>0;return h}
-function fadeHex(h){const n=parseInt(h.slice(1),16),c=[n>>16,n>>8&255,n&255],m=[106,100,120];return'rgb('+c.map((v,i)=>Math.round(v*.35+m[i]*.65)).join(',')+')'}
+function fadeHex(h){if(typeof h!=='string'||h[0]!=='#')return h||'#6a6478';const n=parseInt(h.slice(1),16),c=[n>>16,n>>8&255,n&255],m=[106,100,120];return'rgb('+c.map((v,i)=>Math.round(v*.35+m[i]*.65)).join(',')+')'}
 function palOf(m){
   if(m.key==='hero')return{h:'#4a3020',s:'#f0c8a0',e:'#1a1420',a:'#7a6aa8',b:'#e0ae52',w:'#c8ccd8',t:'#8a5a2b',g:'#e0ae52',o:'#2b2230'};
   const h=hashStr(m.id),armour=m.key==='warrior'||m.key==='paladin',col=m.colour||'#8fd3d0';
-  const p={h:P_HAIR[h%6],s:P_SKIN[(h>>3)%4],e:'#1a1420',a:armour?P_ARM[(h>>5)%3]:col,b:m.key==='paladin'?'#e0ae52':armour?col:P_ACC[(h>>7)%5],w:'#c8ccd8',t:'#8a5a2b',g:P_GLOW[m.key]||'#ffffff',o:'#2b2230'};
+  const p={h:P_HAIR[h%6],s:P_SKIN[(h>>>3)%4],e:'#1a1420',a:armour?P_ARM[(h>>>5)%3]:col,b:m.key==='paladin'?'#e0ae52':armour?col:P_ACC[(h>>>7)%5],w:'#c8ccd8',t:'#8a5a2b',g:P_GLOW[m.key]||'#ffffff',o:'#2b2230'};
   if(m.stranger)for(const k in p)p[k]=fadeHex(p[k]);
   return p;
 }
@@ -903,6 +903,12 @@ function drawBattle(cv){
     g.globalAlpha=1});
 }
 function battleLoop(){
+  // schedule the next frame first, so one drawing hiccup can never freeze the battle scene, the map or the rewards
+  requestAnimationFrame(battleLoop);
+  try{battleFrame()}catch(err){console.error('[30x] frame error',err);BAT.q=[];BAT.cur=null;BFX.length=0;BAT.fade.clear();BAT.flash.clear();
+    if(S&&S.phase==='summary'&&!UI.sheet){BAT.wasBusy=false;render()}}
+}
+function battleFrame(){
   BAT.frame++;
   if(!S||!['combat','summary'].includes(S.phase)){BAT.q=[];BAT.cur=null;BFX.length=0;BAT.fade.clear();BAT.flash.clear();BAT.fx=[];BAT.foes=[];BAT.wasBusy=false}
   else{
@@ -915,7 +921,6 @@ function battleLoop(){
   }
   const tc=document.getElementById('town');if(tc)drawTown(tc);
   const ma=document.getElementById('menuart');if(ma)drawMenuArt(ma);
-  requestAnimationFrame(battleLoop);
 }
 document.addEventListener('click',e=>{
   if(!e.target||e.target.id!=='battle'||!S)return;
@@ -1047,7 +1052,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.1.0';
+const GAME_VERSION='0.1.1';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1647,7 +1652,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.1.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.1.1",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

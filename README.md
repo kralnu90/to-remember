@@ -20,6 +20,10 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.1.1 · 11 November 2026
+- Fixed: the battle scene and Hamlet map could go blank once a returning stranger joined your party, and fight rewards wouldn't appear until you refreshed
+- The battle scene now recovers by itself if a drawing error ever happens, so rewards always pop
+
 ### 0.1.0 · 10 November 2026
 - First public work-in-progress build
 - Main menu with continue, new game, how to play, settings, reviews, Ko-fi, install and update
