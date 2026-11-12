@@ -193,6 +193,10 @@ body.big .wrap{zoom:1.12}
 .roster{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .roster .card.on{border-color:var(--brass);background:color-mix(in srgb, var(--brass) 12%, var(--slate))}
 .stranger .nm{font-style:italic}
+.clover{color:#7fd060;letter-spacing:1px}.clover i{color:var(--line);font-style:normal}
+.unworthy{color:#ff5a6e;font-weight:700}
+.rlbl.nem{background:#2a0e14;color:#ff5a6e;border-color:#ff5a6e}
+.rdoor:hover .rlbl.nem,.rdoor:focus-visible .rlbl.nem{background:#3a1420}
 .flavour{font-size:12px;color:var(--brass);font-style:italic}
 .tavern{display:grid;gap:8px}
 .recruit{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -262,7 +266,7 @@ const TUNE=[
  ['Time drops (seconds)',[['dRegMin','Regular enemy, lowest',13],['dRegMax','Regular enemy, highest',19],['dEliteMin','Elite, lowest',55],['dEliteMax','Elite, highest',80],['dBossMin','Mini-boss, lowest',100],['dBossMax','Mini-boss, highest',140],['dTreasMin','Treasure room, lowest',30],['dTreasMax','Treasure room, highest',50]]],
  ['Smaller party bonus (multiplier)',[['b1','Solo',1.25],['b2','Two',1.12],['b3','Three',1.05],['b4','Four',1]]],
  ['Loot (%)',[['soulbound','Soulbound chance per drop',12],['dropReg','Item drop chance per regular enemy',20],['dropTreasure','Item chance in treasure rooms',40],['crystalReg','Crystal chance per fight',15]]],
- ['Companions',[['returnBase','Fallen return chance, base (%)',40],['returnPerLoop','Extra return chance per loop together (%)',10],['echoChance','Distant Echo chance per room (%)',30]]],
+ ['Companions',[['returnBase','Fallen return chance, base (%)',40],['returnPerLoop','Extra return chance per loop together (%)',10],['echoChance','Distant Echo chance per room (%)',30],['nemChance','Nemesis door chance per room, once ready (%)',35]]],
  ['Combat',[['critBase','Base crit chance (%)',5],['critDmg','Base crit damage (%)',150],['lvlDmg','Damage per character level (%)',10],['lvlArm','Armour per character level',3],['armK','Armour curve, base',30],['armLvl','Armour curve, per level',10],['defendCut','Damage cut while defending (%)',50]]],
  ['Enemies (%)',[['hpMult','Base life (%)',80],['soloLife','Life when you go solo (%)',90],['hpScale','Life growth per minute survived',3.5],['lvlScale','Life growth per party level',13],['dmgScale','Damage growth per minute survived',3.5],['dmgLvl','Damage growth per party level',7],['armScale','Armour growth per minute survived',4]]]
 ];
@@ -348,7 +352,7 @@ const ABILITY_INFO={charge:'Winds up, then charges for double damage',poison:'Po
 function poolFor(era,loop,elite){return FOES[era].filter(c=>(loop||1)>=c.from&&(elite||!c.eliteOnly))}
 /* ranks and modifiers: Elite (1 modifier), Champion (2), Dread (3). Nemesis is earned through Enemy Memory, not rolled. */
 const RANKS={elite:{name:'Elite',hp:2,dmg:1.25,arm:1.2,mods:1,xp:2,shard:1},champion:{name:'Champion',hp:3,dmg:1.5,arm:1.35,mods:2,xp:3,shard:1.3},
- dread:{name:'Dread',hp:4,dmg:1.65,arm:1.5,mods:3,xp:4,shard:1.6},nemesis:{name:'Nemesis',hp:1,dmg:1,arm:1,mods:0,xp:3,shard:1.5}};
+ dread:{name:'Dread',hp:4,dmg:1.65,arm:1.5,mods:3,xp:4,shard:1.6},nemesis:{name:'Nemesis',hp:2.4,dmg:1.35,arm:1.25,mods:1,xp:3,shard:1.5}};
 const MODS={brutal:['Brutal','+30% damage'],executioner:['Executioner','+40% damage against targets below 30% life'],volatile:['Volatile','Explodes on death'],
  bloodthirsty:['Bloodthirsty','Heals 25% of the damage it deals'],armoured:['Armoured','+50% armour'],regenerating:['Regenerating','Heals 6% each round'],
  reflective:['Reflective','Returns 15% of the damage it takes'],timewarped:['Time-Warped','Sometimes takes an extra turn'],echoing:['Echoing','Repeats its last attack at half strength'],
@@ -522,7 +526,7 @@ function treeRespec(){const c=respecCost();if(M.crystals<c||!treeOwned().length)
 function rollType(st){const m=minutes(st),tf=TF();return tickets([['fight',48],['elite',m>=3?7:0],['treasure',12*(1+(tf.treasure||0)/100)],['shrine',7],['quiet',26]])}
 function fillDoors(st,room){const tf=TF();let ch=Math.min(100,tf.hint||0);if(tf.sixth||(tf.routes&&st.stats.rooms<3))ch=100;
   if(tf.sixth&&Math.random()<.2){const free=DIRS.filter(d=>d!==room.entry&&!room.doors[d]);if(free.length)room.doors[pick(free)]={}}
-  for(const d in room.doors){const dr=room.doors[d];if(dr.echo)continue;dr.type=rollType(st);dr.hint=Math.random()*100<ch}}
+  for(const d in room.doors){const dr=room.doors[d];if(dr.echo||dr.nemesis)continue;dr.type=rollType(st);dr.hint=Math.random()*100<ch}}
 const HINT={fight:'Fight',elite:'Elite',treasure:'Treasure',shrine:'Shrine',quiet:'Quiet'};
 function skillsOf(m){const base=CLASSES[m.key].skills;if(m.key!=='hero')return base;const tf=TF(),x=base.slice();
   if(tf.slow)x.push({key:'slow',name:'Slow',lvl:1});if(tf.rewindTurn)x.push({key:'rturn',name:'Rewind Turn',lvl:1});return x}
@@ -560,6 +564,7 @@ function calc(c,gear){
     s.maxHp+=st.hp||0;s.dmgMin+=st.dmg||0;s.dmgMax+=st.dmg||0;s.arm+=st.arm||0;s.dodge+=st.dodge||0;s.critC+=st.critC||0;s.critD+=st.critD||0;
     s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0}
   if(c.talent){s.maxHp=Math.round(s.maxHp*(1+c.talent/100));s.timePct+=c.talent}
+  if(c.cursed){s.maxHp=Math.round(s.maxHp*.9);s.dmgPct=(s.dmgPct||0)-10}
   if(c.key==='hero'&&M&&M.tree){const tf=TF();s.timePct+=tf.shard||0;s.tempo+=tf.tempo||0;s.dmgPct+=tf.dmg||0;s.critC+=tf.critC||0;s.critD+=tf.critD||0;
     s.maxHp+=tf.hp||0;s.arm+=tf.arm||0;s.dodge+=tf.dodge||0;s.maxHp=Math.max(1,Math.round(s.maxHp*(1+(tf.hpPct||0)/100)))}
   s.tempo=Math.min(50,s.tempo);s.patient=Math.min(60,s.patient);s.dodge=Math.min(30,s.dodge);s.critC=Math.min(60,s.critC);
@@ -601,6 +606,9 @@ function makeRoom(st,entry){
   // a Distant Echo can replace one door for a companion still retracing their steps
   const seekers=st.party.filter(m=>m.stranger&&!m.down&&m.stranger.mem<m.stranger.need);
   if(seekers.length&&Math.random()*100<CFG.echoChance+(TF().echo||0)){const s=pick(seekers);const d=pick(Object.keys(doors));doors[d]={echo:s.id}}
+  const hunted=st.party.filter(m=>nemReady(m.stranger)&&!m.down);
+  if(hunted.length&&!st.nemDone&&st.stats.rooms>=2&&Math.random()*100<CFG.nemChance){const s=pick(hunted);const ds=Object.keys(doors).filter(d=>!doors[d].echo);
+    if(ds.length)doors[pick(ds)]={nemesis:s.stranger.killer,sid:s.id}}
   const room={era,name,desc,doors,entry,type:null,insp:0};fillDoors(st,room);return room;
 }
 function spend(st,s,kind){
@@ -611,12 +619,46 @@ function spend(st,s,kind){
   if(st.survival>=T(st)){end(st,'clear');return false}
   return true;
 }
-function end(st,kind){st.phase='end';st.result={kind};st.enemies=[];st.lock=kind==='clear'?'ready':'none'}
+function end(st,kind){if(st.fight&&st.fight.kind==='nemesis')st.nemLost=st.fight.nem.killer;st.phase='end';st.result={kind};st.enemies=[];st.lock=kind==='clear'?'ready':'none'}
+/* ======================= the Nemesis: the creature holding a lost companion's name ======================= */
+// A companion lost to a creature comes back (maybe) as a stranger. Their Distant Echoes bring back their memories,
+// but the last piece, their true name, is held by the creature that killed them. Once the echoes are done, a Nemesis
+// door can appear while they're in the party. Win: every stranger in the party it holds gets their name back.
+// Lose or flee: a strike (three leaves). After three, it takes pity: the name comes back, cursed. Unworthy, forever.
+// Boss kills are just kills: no Nemesis, and the companion is never fully returned (name, no talent).
+const nemReady=s=>!!(s&&s.ready&&s.killer&&!s.boss&&(s.strikes||0)<3);
+const leaves=s=>{const n=3-((s&&s.strikes)||0);return `<span class="clover" aria-label="${n} of 3 chances left">${'☘'.repeat(n)}<i>${'☘'.repeat(3-n)}</i></span>`};
+function recallChar(c,mode){
+  const s=c.stranger,cursed=mode==='cursed'||s.cursed,p=(mode||cursed)?0:Math.min(30,1+s.deathLoop);
+  const e={type:cursed?'cursed':mode==='boss'?'partial':'recall',from:c.name,to:s.realName,p,cls:CLASSES[c.key].cls};
+  (M.memorial||[]).forEach(x=>{if(x.name===s.realName){x.recalled=true;if(cursed)x.cursed=true}});
+  c.name=s.realName;c.talent=p||null;if(cursed)c.cursed=true;c.stranger=null;M.recalls++;return e;
+}
+function nemLines(st,base,held){
+  const s=held[0]&&held[0].stranger,k=(s&&s.strikes)||0;
+  if(k===2)return ['You again. Last time, little stranger.','Lose to me once more and I\'ll give it back... broken.'];
+  if(k===1)return ['Back so soon? I almost admire it.','The name is still mine. Come and take it.'];
+  if(held.length>1)return ['So many faces I\'ve taken names from.','I remember every one of them. Do they?'];
+  return ['So. The one with no name comes back to me.','I kept it, you know. Every letter. Take it, if you can.'];
+}
+function startNemesis(st,door){
+  const base=FOE_BY_NAME[door.nemesis];const m=st.party.find(x=>x.id===door.sid)||st.party.find(x=>nemReady(x.stranger));
+  const held=st.party.filter(x=>nemReady(x.stranger)&&x.stranger.killer===door.nemesis);
+  const lm=(m&&m.stranger&&m.stranger.landmark)||{name:'Somewhere Familiar',era:'present'};
+  st.room={era:lm.era||'present',name:lm.name,desc:`${m?m.name:'Your companion'} goes very still. This is where it happened.`,doors:{},entry:null,type:'nemesis',insp:0};
+  DIRS.sort(()=>Math.random()-.5).slice(0,rnd(1,3)).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
+  st.nemDone=true;
+  startFight(st,[base],'reg');
+  const f=st.enemies[0];f.tier='elite';rankUp(f,'nemesis');f.hp=f.maxHp;
+  st.fight.kind='nemesis';st.fight.nem={killer:base.name,talk:nemLines(st,base,held)};
+  log(st,`The ${base.name} that took a name from you steps out of the dark.`);
+}
 function chooseDoor(st,dir){
   if(st.phase!=='room'||!st.room.doors[dir])return;
   const door=st.room.doors[dir];
   if(!spend(st,Math.max(1,CFG.cMove-(TF().doorCut||0)),'move'))return;
   st.stats.rooms++;
+  if(door.nemesis&&FOE_BY_NAME[door.nemesis]){startNemesis(st,door);return}
   if(door.echo){
     const m=st.party.find(x=>x.id===door.echo);
     const lm=m.stranger.landmark;
@@ -692,7 +734,7 @@ function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);if(f.hp>0)return;
   if(f.ab==='rise'&&!f.rose){f.rose=true;if(st.curAct==='bolt'){log(st,`Time Bolt tears the soul out of ${f.name}. It will not rise again.`)}else{f.hp=Math.round(f.maxHp*.3);log(st,`${f.name} falls... then drags itself back up.`);return}}
   log(st,`${f.name} falls.`);st.stats.kills++;
   if(hasMod(f,'volatile')){const d=Math.max(1,Math.round(f.maxHp*.1));log(st,`${f.name} explodes! Everyone takes ${d}.`);
-    st.party.forEach(p=>{if(p.down)return;p.hp=Math.max(0,p.hp-d);bfx({k:'ehit',f,t:p,d});if(p.hp===0)fall(st,p,f.tier)})}}
+    st.party.forEach(p=>{if(p.down)return;p.hp=Math.max(0,p.hp-d);bfx({k:'ehit',f,t:p,d});if(p.hp===0)fall(st,p,f.tier,f)})}}
 // pct: % of weapon damage. Hits always land unless the foe dodges. Returns damage dealt.
 function strike(st,a,f,pct,verb,critBonus,critDBonus){
   const fDodge=f.hidden?50:f.exposed?0:f.dodge;
@@ -707,7 +749,7 @@ function strike(st,a,f,pct,verb,critBonus,critDBonus){
   d=Math.max(1,Math.round(d*(1-armCut(arm,a.lvl))));
   log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});
   {const back=(hasMod(f,'reflective')?.15:0)+(f.ab==='mirror'&&st.curAct==='bolt'?.25:0);
-    if(back&&!a.down){const r=Math.max(1,Math.round(d*back));a.hp=Math.max(0,a.hp-r);log(st,`${f.name} throws ${r} back at ${a.name}.`);bfx({k:'ehit',f,t:a,d:r});if(a.hp===0)fall(st,a,f.tier)}}
+    if(back&&!a.down){const r=Math.max(1,Math.round(d*back));a.hp=Math.max(0,a.hp-r);log(st,`${f.name} throws ${r} back at ${a.name}.`);bfx({k:'ehit',f,t:a,d:r});if(a.hp===0)fall(st,a,f.tier,f)}}
   if(isH&&f.hp===0){
     if(tf.chain){const o=st.enemies.filter(x=>x.hp>0);if(o.length){const t=pick(o),sd=Math.max(1,Math.round(d*.3));log(st,`The blow carries on into ${t.name} for ${sd}.`);hitFoe(st,t,sd);bfx({k:'hit',a,f:t,d:sd})}}
     if(tf.survivor){const h=Math.max(1,Math.round(a.maxHp*.05));a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}
@@ -767,6 +809,7 @@ function act(st,act,ti){
     case 'rewind':{const tf=TF();ally.regen={pct:90*(1+((tf.rewindHeal||0)+(tf.heroSkill||0))/100),rounds:3+(tf.rewindRounds||0),from:a}};bfx({k:'buff',a,t:ally,txt:'rewind'});log(st,`${a.name} rewinds ${ally.name===a.name?'their own':ally.name+"'s"} wounds. They will heal over the next 3 rounds.`);break;
     case 'stopwatch':st.items.stopwatch--;st.freeNext=true;if(TF().artificer)st.artificer=true;bfx({k:'buff',a,txt:'time stops'});log(st,`${a.name} clicks the Stopwatch. The next action costs no time.`);break;
     case 'smoke':{st.items.smoke--;spend(st,c,'act');if(st.phase==='end')return;st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
+      if(st.fight&&st.fight.kind==='nemesis')st.nemLost=st.fight.nem.killer;
       st.enemies=[];st.fight=null;st.phase='room';st.roomMsg='Smoke fills the room. When it clears, you are somewhere safe. No rewards, but you live.';log(st,'The party escapes in a cloud of smoke.');return}
     case 'potion':{st.items.potion--;const h=Math.round((Math.round(ally.maxHp*.4)+4)*(1+(TF().potionHeal||0)/100));ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
     case 'phoenix':st.items.phoenix--;ally.down=false;ally.hp=Math.ceil(ally.maxHp*.4);bfx({k:'heal',a,t:ally,h:ally.hp,rev:1});log(st,`A Phoenix Down brings ${ally.name} back.`);break;
@@ -794,12 +837,12 @@ function enemyHit(st,f,t,mult,label){
   t.hp=Math.max(0,t.hp-dmg);log(st,`${f.name} ${label||(crit?'crits':'hits')} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit});
   if(hasMod(f,'bloodthirsty')&&f.hp>0){const h=Math.max(1,Math.round(dmg*.25));f.hp=Math.min(f.maxHp,f.hp+h)}
   // on-hit abilities
-  if(f.ab==='poison'||f.ab==='burn'){const d=f.ab==='poison'?{k:'poison',pct:4,rounds:3}:{k:'burn',pct:5,rounds:2};t.dots=(t.dots||[]).filter(x=>x.k!==d.k);t.dots.push(d)}
+  if(f.ab==='poison'||f.ab==='burn'){const d=f.ab==='poison'?{k:'poison',pct:4,rounds:3}:{k:'burn',pct:5,rounds:2};t.dots=(t.dots||[]).filter(x=>x.k!==d.k);d.src=f.tier==='boss'?null:f.name;t.dots.push(d)}
   if(f.ab==='fear'&&!t.feared){t.feared=true;log(st,`${t.name} is shaken. Their next action will take longer.`)}
   if(f.ab==='thief'){st.timeLeft=Math.max(0,st.timeLeft-1);st.stats.stolen=(st.stats.stolen||0)+1;log(st,`${f.name} nibbles a second off your clock.`)}
   if(f.ab==='siphon')siphon(st,f,t);
   if(f.ab==='echo'||hasMod(f,'echoing'))f.echoNext={id:t.id,d:Math.max(1,Math.round(dmg/2))};
-  if(t.hp===0){if(f.ab==='wraith'&&t.key!=='hero'&&M){M.wraith=M.wraith||[];if(!M.wraith.includes(t.id))M.wraith.push(t.id)}fall(st,t,f.tier)}
+  if(t.hp===0){if(f.ab==='wraith'&&t.key!=='hero'&&M){M.wraith=M.wraith||[];if(!M.wraith.includes(t.id))M.wraith.push(t.id)}fall(st,t,f.tier,f)}
   return dmg;
 }
 function siphon(st,f,t){
@@ -809,7 +852,7 @@ function siphon(st,f,t){
 }
 function tickDots(st){
   for(const p of st.party){if(p.down||!p.dots||!p.dots.length)continue;
-    for(const d of p.dots){const dmg=Math.max(1,Math.round(p.maxHp*d.pct/100));p.hp=Math.max(0,p.hp-dmg);log(st,`${p.name} takes ${dmg} from ${d.k==='poison'?'poison':'burning'}.`);bfx({k:'buff',a:p,t:p,txt:`${d.k} −${dmg}`});d.rounds--;if(p.hp===0){fall(st,p,'reg');break}}
+    for(const d of p.dots){const dmg=Math.max(1,Math.round(p.maxHp*d.pct/100));p.hp=Math.max(0,p.hp-dmg);log(st,`${p.name} takes ${dmg} from ${d.k==='poison'?'poison':'burning'}.`);bfx({k:'buff',a:p,t:p,txt:`${d.k} −${dmg}`});d.rounds--;if(p.hp===0){fall(st,p,'reg',d.src?{name:d.src,tier:'reg'}:null);break}}
     p.dots=(p.dots||[]).filter(d=>d.rounds>0&&!p.down)}
 }
 function enemyPhase(st){
@@ -823,7 +866,7 @@ function enemyPhase(st){
     f.exposed=false;
     const live=()=>st.party.filter(p=>!p.down);const target=()=>{const l=live();return l.find(p=>p.taunting)||pick(l)};
     if(f.echoNext){const t=st.party.find(p=>p.id===f.echoNext.id);const d=f.echoNext.d;f.echoNext=null;
-      if(t&&!t.down){t.hp=Math.max(0,t.hp-d);log(st,`An echo of ${f.name}'s last attack hits ${t.name} for ${d}.`);bfx({k:'ehit',f,t,d});if(t.hp===0)fall(st,t,f.tier)}}
+      if(t&&!t.down){t.hp=Math.max(0,t.hp-d);log(st,`An echo of ${f.name}'s last attack hits ${t.name} for ${d}.`);bfx({k:'ehit',f,t,d});if(t.hp===0)fall(st,t,f.tier,f)}}
     if(!live().length)break;
     // Boar: wind up, then charge
     if(f.ab==='charge'){if(f.charging){f.charging=false;const t=target();enemyHit(st,f,t,2,'charges into');continue}
@@ -836,7 +879,7 @@ function enemyPhase(st){
   }
   if(st.party.every(p=>p.down))end(st,'wipe');
 }
-function fall(st,m,cause){if(m.key==='hero'&&TF().unbroken&&!st.unbrokenUsed){st.unbrokenUsed=true;m.hp=1;bfx({k:'buff',a:m,txt:'unbroken'});log(st,`${m.name} refuses to fall. Unbroken.`);return}m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.regen=null;m.downAt={name:st.room.name,era:st.room.era,cause};log(st,`${m.name} is down!`)}
+function fall(st,m,cause,foe){if(m.key==='hero'&&TF().unbroken&&!st.unbrokenUsed){st.unbrokenUsed=true;m.hp=1;bfx({k:'buff',a:m,txt:'unbroken'});log(st,`${m.name} refuses to fall. Unbroken.`);return}m.down=true;m.hp=0;m.defending=false;m.taunting=false;m.buff=null;m.regen=null;m.downAt={name:st.room.name,era:st.room.era,cause,killer:foe&&cause!=='boss'?foe.name:null};st.lastFall={killer:m.downAt.killer,boss:cause==='boss'};log(st,`${m.name} is down!`)}
 function timeMult(st){return 1+Math.max(-50,Math.min(100,st.party.filter(p=>!p.down).reduce((a,p)=>a+(p.timePct||0),0)))/100}
 function winFight(st){
   let earned=0,xp=0,drops=[],cry=0;
@@ -858,13 +901,18 @@ function winFight(st){
   if(TF().linger&&!st.party.some(p=>p.down))earned+=3;st.timeLeft+=earned;st.delta=earned;st.stats.earnFoes+=earned;st.crystals+=cry;
   drops.forEach(d=>st.bag.push(d));st.stats.items+=drops.length;
   if(st.fight.kind==='boss')st.bossesDone.push(st.enemies[0].bossAt);
+  let nemWon=[];
+  if(st.fight.kind==='nemesis'){const k=st.fight.nem.killer;drops.push(makeItem(L+rnd(0,2),'rare'));cry+=2;
+    st.party.forEach(m=>{if(!nemReady(m.stranger)||m.stranger.killer!==k)return;const c=M.chars.find(x=>x.id===m.id);if(!c||!c.stranger)return;
+      const e=recallChar(c,'');m.name=c.name;m.talent=c.talent;m.stranger=null;m.cursed=c.cursed;nemWon.push(e)});
+    st.nemWins=(st.nemWins||[]).concat(nemWon);st.party.forEach(m=>refresh(m))}
   const ups=[];
   st.party.forEach(m=>{if(m.down)return;const tf=TF();m.xp+=Math.round(xp*(1+((m.key==='hero'?tf.heroXp:tf.compXp)||0)/100));let up=false;while(m.xp>=nextXp(m.lvl)){m.xp-=nextXp(m.lvl);m.lvl++;up=true}
     if(up){refresh(m);m.hp=Math.min(m.maxHp,m.hp+CLASSES[m.key].grow);ups.push(`${m.name} → Lv ${m.lvl}`);
       const sk=CLASSES[m.key].skills.find(s=>s.lvl===m.lvl);if(sk)ups.push(`${m.name} learned ${sk.name}!`);if(m.key==='hero')ups.push('+1 skill point for the hero\'s tree')}});
   const net=earned-st.fight.spent,s=st.stats;
   if(s.best===null||net>s.best)s.best=net;if(s.worst===null||net<s.worst)s.worst=net;
-  st.sum={gold,over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry};
+  st.sum={gold,over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry,nem:nemWon};
   st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false});
   if(M&&M.flags)M.flags.tutorialDone=true;
   st.enemies=[];st.fight=null;st.phase='summary';
@@ -902,7 +950,8 @@ function applyReset(){
       const together=M.loop-c.joinLoop+1;
       const chance=Math.min(90,CFG.returnBase+CFG.returnPerLoop*together);
       const returns=Math.random()*100<chance;
-      M.fallen.push({realName:c.stranger?c.stranger.realName:c.name,key:c.key,deathLoop:M.loop,landmark:{name:m.downAt.name,era:m.downAt.era},cause:m.downAt.cause,
+      const lf=kind==='wipe'&&st.lastFall?st.lastFall:{killer:m.downAt.killer,boss:m.downAt.cause==='boss'};
+      M.fallen.push({realName:c.stranger?c.stranger.realName:c.name,key:c.key,deathLoop:M.loop,landmark:{name:m.downAt.name,era:m.downAt.era},cause:m.downAt.cause,killer:lf.killer||null,boss:!!lf.boss,cursed:!!(c.cursed||(c.stranger&&c.stranger.cursed)),
         returnAt:returns?M.loop+rnd(1,3):null,colour:c.colour});
       (M.memorial=M.memorial||[]).push({name:c.stranger?c.stranger.realName:c.name,cls:CLASSES[c.key].cls,loop:M.loop,colour:c.colour,recalled:false});
       M.chars=M.chars.filter(x=>x.id!==c.id);M.party=M.party.filter(id=>id!==c.id);M.lost++;
@@ -911,16 +960,16 @@ function applyReset(){
     }
     c.lvl=m.lvl;c.xp=m.xp;c.gear=kept;
     if(Object.keys(kept).length||lostGear)ev.push({type:'gear',name:m.name,kept:Object.values(kept).map(i=>i.name),lost:lostGear});
-    if(c.stranger){
-      c.stranger.mem+=1+(st.echoesFollowed[c.id]||0);
-      if(c.stranger.mem>=c.stranger.need){
-        const p=Math.min(30,1+c.stranger.deathLoop);
-        ev.push({type:'recall',from:c.name,to:c.stranger.realName,p,cls:CLASSES[c.key].cls});
-        (M.memorial||[]).forEach(x=>{if(x.name===c.stranger.realName)x.recalled=true});
-        c.name=c.stranger.realName;c.talent=p;c.stranger=null;M.recalls++;
-      }
+    if(c.stranger){const s=c.stranger;
+      if(st.nemLost&&nemReady(s)&&s.killer===st.nemLost){s.strikes=(s.strikes||0)+1;
+        if(s.strikes>=3)ev.push(recallChar(c,'cursed'));else ev.push({type:'strike',name:c.name,killer:s.killer,left:3-s.strikes})}
+      else{s.mem+=1+(st.echoesFollowed[c.id]||0);
+        if(s.mem>=s.need&&!s.ready){
+          if(s.killer&&!s.boss){s.ready=true;s.strikes=s.strikes||0;ev.push({type:'nemready',name:c.name,killer:s.killer})}
+          else ev.push(recallChar(c,s.boss?'boss':''))}}
     }
   }
+  (st.nemWins||[]).forEach(e=>ev.push(e));
   flags().firstRun=true;
   M.loop++;M.last=kind;M.store=rollStore();
   // strangers drift back to the tavern
@@ -928,7 +977,7 @@ function applyReset(){
   M.fallen=M.fallen.filter(f=>!(f.returnAt!==null&&f.returnAt<=M.loop));
   M.tavern=rollTavern();
   back.forEach(f=>{
-    const r={id:uid(),key:f.key,lvl:1,stranger:{realName:f.realName,mem:0,need:Math.max(1,Math.ceil(f.deathLoop/2)-(TF().echoBond||0)),deathLoop:f.deathLoop,landmark:f.landmark,cause:f.cause},name:randName(),colour:f.colour};
+    const r={id:uid(),key:f.key,lvl:1,stranger:{realName:f.realName,mem:0,need:Math.max(1,Math.ceil(f.deathLoop/2)-(TF().echoBond||0)),deathLoop:f.deathLoop,landmark:f.landmark,cause:f.cause,killer:f.killer===undefined?(f.cause==='boss'?null:pick(poolFor(f.landmark&&f.landmark.era==='future'?'future':'present',M.loop)).name):f.killer,boss:!!f.boss||f.cause==='boss',strikes:0,ready:false,cursed:!!f.cursed},name:randName(),colour:f.colour};
     const i=M.tavern.findIndex(x=>!x.stranger&&x.key===f.key);M.tavern.splice(i>=0?i:0,i>=0?1:0,r);
     ev.push({type:'stranger',cls:CLASSES[f.key].cls});
   });
@@ -944,7 +993,7 @@ function hire(rid,name){
   M.chars.push(c);if(M.party.length<3)M.party.push(c.id);
   M.tavern=M.tavern.filter(x=>x.id!==rid);
 }
-function memStage(c){const s=c.stranger;if(!s)return '';const f=s.mem/s.need;
+function memStage(c){const s=c.stranger;if(!s)return '';if(nemReady(s))return `Remembers how they fell. The ${esc(s.killer)} still holds their name. Bring them into the loop. ${leaves(s)}`;const f=s.mem/s.need;
   return f===0?'A stranger. Something about them feels familiar.':f<.5?'Sometimes pauses, as if remembering something.':f<1?'Called you by name once, then looked confused.':'On the edge of remembering.'}
 
 /* ======================= autoplay (balance testing) ======================= */
@@ -1105,10 +1154,11 @@ const RICON={
  treasure:['.......','.ggggg.','gbbbbbg','ggggggg','gbbkbbg','gbbbbbg','ggggggg'],
  shrine:['...y...','..yoy..','...y...','..www..','..www..','..www..','.wwwww.'],
  quiet:['..ccc..','.cc....','cc.....','cc.....','cc.....','.cc....','..ccc..'],
- unknown:['.wwww..','ww..ww.','....ww.','...ww..','..ww...','.......','..ww...']
+ unknown:['.wwww..','ww..ww.','....ww.','...ww..','..ww...','.......','..ww...'],
+ nemesis:['.rrrrr.','rr...rr','r.rrr.r','r.rwr.r','r.rrr.r','rr...rr','.rrrrr.']
 };
-const RICON_PAL={k:'#c8ccd8',w:'#eef2f8',g:'#e8b840',b:'#8a5a2a',y:'#ffe680',o:'#ff9a3a',c:'#bfe8ff'};
-function roomKey(r){return [r.name,r.era,r.type==='echo'?'echo':'',DIRS.map(d=>{const x=r.doors[d];return x?(x.echo?'E':x.hint?x.type:'?'):r.entry===d?'c':'-'}).join('')].join('|')}
+const RICON_PAL={r:'#ff5a6e',k:'#c8ccd8',w:'#eef2f8',g:'#e8b840',b:'#8a5a2a',y:'#ffe680',o:'#ff9a3a',c:'#bfe8ff'};
+function roomKey(r){return [r.name,r.era,r.type==='echo'?'echo':'',DIRS.map(d=>{const x=r.doors[d];return x?(x.nemesis?'N':x.echo?'E':x.hint?x.type:'?'):r.entry===d?'c':'-'}).join('')].join('|')}
 function makeRoomArt(r){
   const A=artPainter(RW,RH),{P,R,E,POLY,SPRITE,light}=A,fut=r.era==='future',echo=r.type==='echo';
   const n=(x,y,s)=>tnz(x,y,s);
@@ -1144,7 +1194,7 @@ function makeRoomArt(r){
   const doorSide=(x0,st,right)=>{R(x0,40,x0+11,73,'#141018');R(x0,40,x0+11,40,'#2a2430');R(x0,73,x0+11,73,'#2a2430');
     if(st==='open')return;const fx=right?x0:x0+8;R(fx,42,fx+3,71,plank[0]);R(right?fx+3:fx,42,right?fx+3:fx,71,plank[1]);
     R(fx,48,fx+3,48,iron);R(fx,64,fx+3,64,iron);P(right?fx:fx+3,57,'#e8b840')};
-  const sign=(d,dr)=>{const pos={n:[61,32],s:[61,75],w:[15,53],e:[106,53]}[d];const ico=dr.echo?null:dr.hint?RICON[dr.type]:RICON.unknown;
+  const sign=(d,dr)=>{const pos={n:[61,32],s:[61,75],w:[15,53],e:[106,53]}[d];const ico=dr.nemesis?RICON.nemesis:dr.echo?null:dr.hint?RICON[dr.type]:RICON.unknown;
     if(!ico)return;R(pos[0]-1,pos[1]-1,pos[0]+7,pos[1]+7,'#2a2024');SPRITE(pos[0],pos[1],ico,RICON_PAL,true)};
   DIRS.forEach(d=>{const dr=r.doors[d],st=dr?(dr.echo?'echo':'shut'):r.entry===d?'open':null;if(!st)return;
     if(d==='n')doorN(st==='open'?'open':'shut');if(d==='s')doorS(st==='open'?'open':'shut');
@@ -1200,7 +1250,7 @@ function drawRoom(cv){
   [[30,10],[97,10]].forEach(([x,y],k)=>{const h=still?3:2+Math.round(bh(k*7,f>>2)*2),s=still?0:(bh(k,f>>3)>.5?1:0);
     for(let j=0;j<h+1;j++)for(let i=0;i<2;i++)P(x+i+(j===h?s:0),y-1-j,j===0?(fut?'#e0ffb0':'#fff0a0'):j<h?(fut?'#9fd060':'#ffb030'):(fut?'#5f9030':'#e8602a'))});
   /* echo doors shimmer in the companion's colour */
-  DIRS.forEach(d=>{const dr=r.doors[d];if(!dr||!dr.echo)return;const m=S.party.find(x=>x.id===dr.echo);const c=(m&&m.colour)||'#8fd3d0';
+  DIRS.forEach(d=>{const dr=r.doors[d];if(!dr||!(dr.echo||dr.nemesis))return;const m=dr.echo&&S.party.find(x=>x.id===dr.echo);const c=dr.nemesis?'#ff5a6e':(m&&m.colour)||'#8fd3d0';
     const b={n:[54,4,19,17],s:[54,RH-10,19,9],w:[0,40,11,33],e:[RW-12,40,11,33]}[d];
     for(let k=0;k<14;k++){const t=still?k:(f*.05+k*1.7);P(b[0]+((k*7+(still?0:f>>3))%(b[2]+1)),b[1]+(Math.sin(t)*.5+.5)*b[3],k%3?c:'#ffffff')}});
   /* dust motes stuck in time, or mist in an echo, or fireflies in the future */
@@ -1662,7 +1712,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.6.6';
+const GAME_VERSION='0.7.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1726,7 +1776,7 @@ function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is 
   <div class="small"><b>Gold and crystals.</b> Gold is kept in your enchanted purse between loops. Spend it at the General Store on supplies for your next run, and sell spare loot while time is frozen after a cleared run. Crystals bind gear (making it soulbound) at your Cottage and buy permanent upgrades in the Wizard's Sanctum.</div>
   <div class="small"><b>Fights are turn-based.</b> Pick an action, then tap a target on the battle scene or its card. Attacks always land unless the target dodges. Armour cuts the damage you take, crits hit for extra, and skills deal a share of your weapon damage, so better gear makes every skill stronger.</div>
   <div class="small"><b>Smaller parties earn more.</b> Fewer companions means bigger time drops and more XP each.</div>
-  <div class="small"><b>Fallen companions.</b> Anyone still down when the loop resets is lost. Some come back later as strangers who don't remember you. Follow their Distant Echoes to help them remember, and they return stronger.</div>
+  <div class="small"><b>Fallen companions.</b> Anyone still down when the loop resets is lost. Some come back later as strangers who don't remember you. Follow their Distant Echoes to help them remember. The last piece, their true name, is held by the creature that killed them: once their echoes are done, a red Nemesis door appears while they're in your party. Win and they return stronger. Lose three times and it gives the name back cursed.</div>
   <div class="small"><b>The Hamlet</b> is safe. Hire companions at the Tavern, choose your party at the Campfire, check gear at your Cottage, and talk to the Wizard. He knows more than he's letting on.</div>
   </div><button class="btn primary" data-a="close">Got it</button>`}
 function setSeg(k,opts){return `<div class="seg">${opts.map(([v,l])=>`<button class="btn ${String(SET[k])===String(v)?'on':''}" data-set="${k}:${v}" aria-pressed="${String(SET[k])===String(v)}">${l}</button>`).join('')}</div>`}
@@ -1797,7 +1847,7 @@ function rosterHTML(){
   return `<div class="roster">
     <div class="card on"><span class="nm">${esc(h.name)}</span><span class="sub">Fixed Point · Lv ${h.lvl}</span><span class="small">Always comes along</span></div>
     ${comps.map(c=>`<button class="card ${M.party.includes(c.id)?'on':''} ${c.stranger?'stranger':''}" data-pick="${c.id}">
-      <span class="nm" style="color:${c.stranger?'inherit':c.colour}">${esc(c.name)}</span><span class="sub">${CLASSES[c.key].cls} · Lv ${c.lvl}${c.talent?' · remembered':''}</span>
+      <span class="nm" style="color:${c.stranger?'inherit':c.colour}">${esc(c.name)}</span><span class="sub">${CLASSES[c.key].cls} · Lv ${c.lvl}${c.talent?' · remembered':''}${c.cursed?' · <span class="unworthy">Unworthy</span>':''}</span>
       ${c.stranger?`<span class="flavour">${memStage(c)}</span>`:`<span class="small">${M.party.includes(c.id)?'Coming along':'Resting by the fire'}</span>`}</button>`).join('')}
   </div>${comps.length?'':'<span class="small">No companions yet. Hire some at the tavern.</span>'}`;
 }
@@ -2005,7 +2055,7 @@ function placeSheet(kind){
       <div class="seg"><button class="btn ${!UI.quick?'on':''}" data-q="0">Full (${fmt(CFG.target)})</button><button class="btn ${UI.quick?'on':''}" data-q="1">Quick test (10:00)</button></div></div>
     <div class="row"><button class="btn" data-a="close">Not yet</button><button class="btn primary" data-a="enter">Enter the dungeon</button></div>`;
   if(kind==='memorial'){const list=M.memorial||[];return `<div class="eyebrow">The Memorial Stone</div><h2>Those the loop took</h2>
-    ${list.length?`<div class="events">${list.map(m=>`<div class="item ${m.recalled?'soul':''}"><span class="nm" style="color:${m.colour}">${esc(m.name)}${m.recalled?' ✦':''}</span><span class="st">${m.cls} · lost on loop ${m.loop}${m.recalled?' · came back and remembered':''}</span></div>`).join('')}</div>`:'<p class="desc">No names yet. Keep it that way if you can.</p>'}
+    ${list.length?`<div class="events">${list.map(m=>`<div class="item ${m.recalled?'soul':''}"><span class="nm" style="color:${m.colour}">${esc(m.name)}${m.recalled?(m.cursed?' ✕':' ✦'):''}</span><span class="st">${m.cls} · lost on loop ${m.loop}${m.recalled?' · came back and remembered':''}</span></div>`).join('')}</div>`:'<p class="desc">No names yet. Keep it that way if you can.</p>'}
     <button class="btn primary" data-a="close">Leave</button>`}
   if(kind==='shop')return storeSheet();
   if(kind==='tree')return treeSheet();
@@ -2036,11 +2086,12 @@ function roomView(){
   const box=d=>{const[x,y,w,h]=RD_BOX[d];return `left:${x/RW*100}%;top:${y/RH*100}%;width:${w/RW*100}%;height:${h/RH*100}%`};
   const doors=DIRS.map(d=>{
     const dr=r.doors[d];if(!dr)return '';
+    if(dr.nemesis){const m=S.party.find(x=>x.id===dr.sid);return `<button class="rdoor ${d}" data-door="${d}" style="${box(d)}" aria-label="Nemesis door: the ${esc(dr.nemesis)} holding ${m?esc(m.name)+'\'s':'a'} name. Costs ${cost} seconds"><span class="rlbl nem">Nemesis · −${cost}s</span></button>`}
     if(dr.echo){const m=S.party.find(x=>x.id===dr.echo);return `<button class="rdoor ${d}" data-door="${d}" style="${box(d)};--echo:${m.colour}" aria-label="Distant Echo, costs ${cost} seconds"><span class="rlbl echo">Distant Echo · −${cost}s</span></button>`}
     return `<button class="rdoor ${d}" data-door="${d}" style="${box(d)}" title="The path is worn, but the stones beneath it are unfamiliar." aria-label="${dr.hint?HINT[dr.type]:'Unknown'} door, costs ${cost} seconds"><span class="rlbl">${dr.hint?HINT[dr.type]:'?'} · −${cost}s</span></button>`;
   }).join('');
   const nDoors=Object.keys(r.doors).length;
-  const echoNote=Object.values(r.doors).find(x=>x.echo);
+  const echoNote=Object.values(r.doors).find(x=>x.echo),nemNote=Object.values(r.doors).find(x=>x.nemesis),nemM=nemNote&&S.party.find(x=>x.id===nemNote.sid);
   return `<section class="room">
     <div class="roomhead"><h2>${esc(r.name)}</h2><span class="era ${r.era}">${r.era}</span></div>
     <p class="desc">${esc(r.desc)}</p>
@@ -2048,6 +2099,7 @@ function roomView(){
     ${r.name==='Market Square'&&S.phase==='room'&&TF().market&&!S.marketUsed?`<button class="btn primary" data-a="market">Pull time to heel <span class="cost">once per run</span></button>`:''}
     ${INSPECT[r.name]&&S.phase==='room'?`<button class="btn" data-a="inspect">${INSPECT[r.name].label} <span class="cost">free</span></button>`:''}
     ${echoNote?`<div class="note" style="border-color:${S.party.find(x=>x.id===echoNote.echo).colour}">${esc(S.party.find(x=>x.id===echoNote.echo).name)} keeps glancing at one of the doors.</div>`:''}
+    ${nemNote&&nemM?speak('shadow','Behind the red door',[`Little ${CLASSES[nemM.key].cls.toLowerCase()}... I have something of yours.`,'*'+nemM.name+' goes pale. They know that voice.*']):''}
     <div class="chamber"><canvas id="room" width="${RW*RS}" height="${RH*RS}" role="img" aria-label="${esc(r.name)}, with ${nDoors} door${nDoors===1?'':'s'} to choose from"></canvas>${doors}</div>
     <p class="small chint">Choose a door. Every step costs time, and what lies behind is unknown.</p>
   </section>`;
@@ -2067,6 +2119,7 @@ function fightView(){
   }
   return `<section class="room">
     <div class="turnline"><h2>${esc(S.room.name)}</h2><span class="era ${S.room.era}">${S.room.era}</span></div>
+    ${S.fight&&S.fight.nem&&S.fight.spent<1?speak('shadow',S.fight.nem.killer+' · Nemesis',S.fight.nem.talk):''}
     ${battleCanvas()}
     <div class="foes">${foes}</div>
     <div class="rollrow"><div style="min-width:0;flex:1"><div class="log">${S.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div></div></div>
@@ -2080,7 +2133,7 @@ function partyView(){
     const tgt=(t==='ally'&&!m.down)||(t==='downed'&&m.down)||(t==='sacrifice'&&!m.down&&m.key!=='hero');
     return `<button class="card ${m.down?'down':''} ${S.phase==='combat'&&i===S.turn&&!p?'active':''} ${tgt?'target':''}" data-ally="${i}" ${tgt?'':'tabindex="-1"'}>
       <span class="nm" style="color:${m.stranger||m.key==='hero'?'inherit':m.colour}">${esc(m.name)}</span><span class="sub">${CLASSES[m.key].cls} · Lv ${m.lvl}${m.taunting?' · taunting':''}${m.defending?' · bracing':''}${m.down?' · down':''}${(m.dots||[]).map(d=>' · '+(d.k==='poison'?'poisoned':'burning')).join('')}${m.feared?' · shaken':''}</span>
-      <span class="sub">${m.hp}/${m.maxHp} life · XP ${m.xp}/${nextXp(m.lvl)}</span><span class="hp"><i style="width:${m.hp/m.maxHp*100}%"></i></span></button>`}).join('')}</section>
+      ${nemReady(m.stranger)?`<span class="sub">Name held by the ${esc(m.stranger.killer)} ${leaves(m.stranger)}</span>`:''}<span class="sub">${m.hp}/${m.maxHp} life · XP ${m.xp}/${nextXp(m.lvl)}</span><span class="hp"><i style="width:${m.hp/m.maxHp*100}%"></i></span></button>`}).join('')}</section>
     <div class="small" style="text-align:center">${S.party.length===1?'Solo':S.party.length+' in party'} (×${partyBonus(S)} drops) · Gold this run: ${S.gold||0} · Crystals: ${S.crystals}</div>`;
 }
 function endView(){
@@ -2116,7 +2169,7 @@ function renderSheet(){
   const kind=UI.sheet;let h='';
   if(kind==='summary'){
     const s=S.sum;
-    h=`<div class="eyebrow">Encounter complete</div><h2>${s.net>=0?'A profitable fight':'That cost you'}</h2>
+    h=`${(s.nem||[]).length?`<div class="eyebrow">The Nemesis falls</div>${s.nem.map(e=>`<div class="namefade"><span class="eyebrow">It lets go of a name</span><span class="old">${esc(e.from)}</span><span class="new">${esc(e.to)}</span><q class="desc" style="text-align:center">...that's my name. I remember all of it now.</q><span class="small">Talent unlocked: +${e.p}% max HP and +${e.p}% time from drops.</span></div>`).join('')}`:''}<div class="eyebrow">Encounter complete</div><h2>${s.net>=0?'A profitable fight':'That cost you'}</h2>
     <div class="ledger"><span>Time spent</span><span class="neg">−${secs(s.spent)}</span><span>Time shards earned</span><span class="pos">+${secs(s.earned)}</span>
     <span class="total">Net</span><span class="total ${s.net>=0?'pos':'neg'}">${s.net>=0?'+':'−'}${secs(Math.abs(s.net))}</span></div>
     ${s.over?`<div class="small">${s.over} healing wasted on full health. Heal when it's needed.</div>`:''}
@@ -2195,6 +2248,12 @@ function eventsSheet(){
     if(e.type==='anchor')return `<div class="small">Anchor kept <b>${esc(e.name)}</b>.</div>`;
     if(e.type==='gear')return `<div class="small"><b>${esc(e.name)}</b>: ${e.kept.length?'kept '+e.kept.map(esc).join(', '):'kept nothing'}${e.lost?`; ${e.lost} item${e.lost>1?'s':''} turned to dust`:''}.</div>`;
     if(e.type==='stranger')return `<div class="note">There's a new ${e.cls.toLowerCase()} at the tavern. They look... familiar.</div>`;
+    if(e.type==='nemready')return `<div class="note" style="border-color:#ff5a6e"><b>${esc(e.name)}</b> remembers how they fell. A <b>${esc(e.killer)}</b> still holds their true name. Take them into the loop and a Nemesis door will appear.</div>`;
+    if(e.type==='strike')return `<div class="note" style="border-color:#ff5a6e">The ${esc(e.killer)} keeps <b>${esc(e.name)}</b>'s name. ${e.left===1?'One chance left.':e.left+' chances left.'} <span class="clover">${'☘'.repeat(e.left)}<i>${'☘'.repeat(3-e.left)}</i></span></div>`;
+    if(e.type==='cursed')return `<div class="namefade"><span class="eyebrow">The Nemesis takes pity</span><span class="old">${esc(e.from)}</span><span class="new">${esc(e.to)}</span>
+      <q class="desc" style="text-align:center">It gave it back. Like scraps to a dog.</q><span class="small">Their name returns, but they are marked <span class="unworthy">Unworthy</span>: no talent, and a little weaker, forever.</span></div>`;
+    if(e.type==='partial')return `<div class="namefade"><span class="eyebrow">Part of a memory returns</span><span class="old">${esc(e.from)}</span><span class="new">${esc(e.to)}</span>
+      <q class="desc" style="text-align:center">I know my name. The rest... it's gone with whatever killed me.</q><span class="small">What a mini-boss takes never fully comes back: no talent.</span></div>`;
     if(e.type==='recall')return `<div class="namefade"><span class="eyebrow">A memory returns</span><span class="old">${esc(e.from)}</span><span class="new">${esc(e.to)}</span>
       <q class="desc" style="text-align:center">...that's my name. You gave me that name.</q><span class="small">Talent unlocked: +${e.p}% max HP and +${e.p}% time from drops.</span></div>`;
     return '';
@@ -2374,7 +2433,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.6.6",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

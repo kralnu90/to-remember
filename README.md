@@ -20,6 +20,15 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.7.0 · 12 November 2026
+- **The Nemesis system:** the creature that kills a companion now keeps their true name. When they come back as a stranger and finish their Distant Echoes, a red Nemesis door can appear while they're in your party
+- Behind it, the killer waits where your companion fell, and it talks. Beat it and every stranger in your party whose name it holds remembers who they are, and gets their talent
+- Lose, run out of time or flee with a Smoke Bomb and it keeps the name: that's a strike, shown as three leaves on the stranger's card. After three strikes it takes pity and gives the name back cursed. They're marked Unworthy: no talent, and a little weaker, forever
+- If the whole party falls, the last creature standing holds every lost companion's name. Each win only returns the names of the strangers you brought, so it may need beating more than once
+- A Nemesis has one modifier and a fixed boost. It never snowballs
+- Companions killed by a mini-boss can't be fully returned: they get their name back, but never their talent
+- The Memorial Stone marks the Unworthy with ✕
+
 ### 0.6.6 · 12 November 2026
 - **Sharper sprites:** every class and creature is redrawn with twice the detail, with shading and outlines to match the new backdrops
 - The hero carries a glowing hourglass clasp, the warrior and paladin have proper shields, casters have glowing staffs, the ranger has a bow and quiver, and the bard plays a lute
