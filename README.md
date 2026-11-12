@@ -20,6 +20,11 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.7.2 · 12 November 2026
+- **The hero, redrawn:** the Fixed Point now fights with painted sprites from Kris's new sheet: a ready stance, a sword swing (it bursts into flame on a crit), glowing hands when casting, and a proper fall when downed
+- **The wizard has come outside:** he waits by his tower door on the hamlet map, shifting on his feet, and now and then waves or throws up a few sparks. The hero stands by the fountain
+- The main menu shows the new hero too
+
 ### 0.7.1 · 12 November 2026
 - **New portraits:** every character who talks now has a detailed painted pixel-art portrait, from the hero and the wizard to each class, the Nemesis shadow and the two final bosses. They give a little bob as they speak
 - The portraits are saved for offline play too

@@ -1296,6 +1296,24 @@ const SHADE_C={};
 function shadeCol(c){if(SHADE_C[c])return SHADE_C[c];let r,g,b;
   if(c[0]==='#'){const n=parseInt(c.slice(1),16);r=n>>16;g=n>>8&255;b=n&255}else{const m=c.match(/\d+/g)||[0,0,0];[r,g,b]=m.map(Number)}
   return SHADE_C[c]=`rgb(${Math.round(r*.68)},${Math.round(g*.68)},${Math.round(b*.72)})`}
+// Painted character sprites (since 0.7.2): the hero in battle and on the hamlet map, and the wizard outside his tower.
+// One atlas, sprites/chars.webp; each entry is [x, y, w, h, feetX] in atlas pixels, drawn 1:1 on the canvas.
+// Cut from Kris's sheets with tools/cut_sheets.py (sources in tools/sheet_*_source.jpg).
+const CHAR_META={"hero_idle":[0,0,37,84,15.4],"hero_attack":[39,0,68,85,45.8],"hero_crit":[109,0,81,84,56.1],"hero_cast":[192,0,76,86,34.2],"hero_heal":[270,0,71,88,35.4],"hero_down":[343,0,80,60,49.3],"hero_town":[425,0,23,48,11.0],"wiz_idle0":[450,0,26,56,12.4],"wiz_idle1":[478,0,26,56,12.8],"wiz_idle2":[506,0,26,56,13.9],"wiz_wave":[534,0,35,54,17.9],"wiz_cheer":[571,0,36,53,19.0],"wiz_spark":[609,0,40,60,19.4]};
+const CHAR_ATLAS={img:null,ok:false};
+function charImg(){if(!CHAR_ATLAS.img){const i=new Image();i.onload=()=>{CHAR_ATLAS.ok=true};i.src='sprites/chars.webp';CHAR_ATLAS.img=i}return CHAR_ATLAS.ok?CHAR_ATLAS.img:null}
+// feetX/feetY in canvas pixels. Returns false until the atlas has loaded, so callers can fall back to the old sprite.
+function drawChar(g,key,feetX,feetY,o){
+  const img=charImg(),r=CHAR_META[key];if(!img||!r)return false;const[x,y,w,h,fx]=r;o=o||{};
+  g.save();g.globalAlpha=o.alpha==null?1:o.alpha;if(o.flash)g.filter='brightness(5)';g.imageSmoothingEnabled=false;
+  const dy=Math.round(feetY-h);
+  if(o.flip){const dx=Math.round(feetX-(w-fx));g.translate(dx+w,dy);g.scale(-1,1);g.drawImage(img,x,y,w,h,0,0,w,h)}
+  else g.drawImage(img,x,y,w,h,Math.round(feetX-fx),dy,w,h);
+  g.restore();return true;
+}
+function heroFrame(m,down){if(down)return 'hero_down';const e=BAT.cur;
+  if(e&&e.a===m){if(e.k==='hit'||e.k==='miss')return e.crit?'hero_crit':'hero_attack';if(e.k==='heal')return 'hero_heal';if(e.k==='buff')return 'hero_cast'}
+  return 'hero_idle'}
 const GREY={h:'#5a5468',s:'#8a8698',e:'#e0ae52',a:'#4a4458',b:'#3a3547',w:'#7a7690',o:'#2b2230',t:'#5a4632',g:'#e0ae52'};
 const FOE_LOOK={
  'Clockwork Rat':{s:'rat',p:{k:'#a8822a',e:'#e24b4a',g:'#e0ae52'}},
@@ -1492,8 +1510,9 @@ function drawBattle(cv){
     const down=m.down&&!batPending(m);
     let ox=cx-w/2+lungeOf(m,-1),oy=feet-h+(down||reduceMotion()?0:(((f>>5)+i+1)%2))+hopOf(m)+(down?3:0);
     const fl=(BAT.flash.get(m)||0)>0&&BAT.flash.get(m)%2;
-    drawSpr(g,rows,palOf(m),ox,oy,0,fl,down?.4:1);
-    if(!down&&P_GLOW[m.key]&&!m.stranger&&(f>>4)%3===0){const gy=rows.findIndex(r=>r.includes('g'));if(gy>=0)P(Math.round(ox+rows[gy].indexOf('g')),Math.round(oy+gy-1),'#ffffff')}
+    const hk=m.key==='hero'?heroFrame(m,down):null;
+    if(!(hk&&drawChar(g,hk,(cx+lungeOf(m,-1))*BC,(feet+(down?0:oy-(feet-h)))*BC,{flip:hk==='hero_idle',flash:fl,alpha:down?.75:1})))drawSpr(g,rows,palOf(m),ox,oy,0,fl,down?.4:1);
+    if(!hk&&!down&&P_GLOW[m.key]&&!m.stranger&&(f>>4)%3===0){const gy=rows.findIndex(r=>r.includes('g'));if(gy>=0)P(Math.round(ox+rows[gy].indexOf('g')),Math.round(oy+gy-1),'#ffffff')}
     if(m.defending&&!down){g.fillStyle='rgba(143,211,208,.35)';g.fillRect(Math.round(ox-1)*BC,Math.round(oy-1)*BC,(w+2)*BC,(h+2)*BC)}
     pos.set(m,[cx,oy]);BAT.rects.push({kind:'ally',i,x0:cx-w/2-1,x1:cx+w/2+1,y0:oy-1,y1:feet+1});
     if((pend==='ally'&&!m.down)||(pend==='downed'&&m.down))arrow(Math.round(cx),Math.round(oy));
@@ -1702,6 +1721,9 @@ function drawTown(cv){
   /* frozen things: still, except a one-pixel stutter every few seconds */
   const jit=still?0:((f%200)<6?((f>>1)%2?1:-1):0);
   T_FROZEN.forEach(([x,y,c],k)=>P(x+(k%2?jit:0),y-(k%2?0:jit),c));
+  /* the wizard waits by his tower door; the hero stands by the fountain */
+  {const t=still?0:f%720,wk=t>600&&t<660?'wiz_wave':t>=660&&t<700?'wiz_spark':'wiz_idle'+((still?0:(f>>5))%3);
+    drawChar(g,wk,171*TB,111*TB);drawChar(g,'hero_town',104*TB,174*TB)}
   /* the tower's star and fireflies */
   if(!still&&(f>>4)%3===0)P(188,9,'#ffffff');
   for(let k=0;k<14;k++){const t=T_TREES[(k*7)%T_TREES.length];const x=t[0]+Math.sin(f*.02+k)*(10+k%5),y=t[1]+Math.cos(f*.025+k*2)*(8+k%3)-4;
@@ -1718,7 +1740,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.1';
+const GAME_VERSION='0.7.2';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1772,7 +1794,7 @@ function drawMenuArt(cv){
     let pal=L.p,ox=cx-w/2;if(L.warp&&(f+i*37)%150<9){pal=Object.assign({},L.p,{a:'#2a5a6a',w:'#8fd3d0',e:'#ece3cc'});ox+=(f%2)?1:-1}
     drawSpr(g,rows,pal,ox,ft-h+(reduceMotion()?0:((f>>5)+i)%2),L.flip,false,1)});
   const ps=slotsFor(4,'p');MENU_PARTY.forEach((m,i)=>{const rows=SPR[m.key],w=rows[0].length,h=rows.length,[cx,ft]=ps[i];
-    drawSpr(g,rows,palOf(m),cx-w/2,ft-h+(reduceMotion()?0:((f>>5)+i+1)%2),0,false,1)});
+    const by=ft+(reduceMotion()?0:((f>>5)+i+1)%2);if(!(m.key==='hero'&&drawChar(g,'hero_idle',cx*BC,by*BC,{flip:true})))drawSpr(g,rows,palOf(m),cx-w/2,by-h,0,false,1)});
 }
 function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is everything</h2>
   <div class="events">
@@ -2439,7 +2461,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.1",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.2",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
