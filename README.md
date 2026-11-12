@@ -20,6 +20,10 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.3 · 12 November 2026
+- **A new look for the hamlet:** the map is redrawn in much more detailed pixel art, at night, with lamplight, glowing windows and a swirling rift at the Edge of Time
+- The hamlet is stuck in time: chimney smoke, the fountain's spray, the campfire's sparks and a floating apple hang in the air, twitching now and then
+
 ### 0.6.2 · 12 November 2026
 - The shopkeeper at the General Store now has a talking portrait too
 
