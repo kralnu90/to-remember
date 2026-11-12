@@ -55,3 +55,4 @@ Upload this file at the start of a new session so Claude can pick up where we le
 - 11 Nov 2026: v0.4.0 gold, General Store, selling in the reset window, binding with crystals, Wizard's Sanctum. A full run earns roughly 300 gold at level 1 (sim).
 - 11 Nov 2026: v0.5.0 hero skill tree (spider-web ring, 60 nodes + 6 hybrids), door hints, Market Square capstone shop, Slow and Rewind Turn skills.
 - 12 Nov 2026: v0.6.0 bestiary v1 (16 creatures, abilities, Elite/Champion/Dread ranks, 10 modifiers). Village named Bleakthorpe, world Aetherfall.
+- 12 Nov 2026: v0.6.1–0.6.6 graphics overhaul: talking dialogue portraits (15, via `speak()`), the hamlet redrawn at night with baked lighting, pixel-art dungeon rooms with real doors and era floors, lit battle backdrops per room, and 2× hi-res sprites for every class and creature.
