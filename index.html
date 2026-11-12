@@ -119,6 +119,8 @@ body.big .wrap{zoom:1.12}
 .card.target{border-color:var(--brass);box-shadow:0 0 0 2px color-mix(in srgb, var(--brass) 35%, transparent)}
 .card.active{border-color:var(--parch)}
 .card.elite .nm{color:var(--brass)}
+.card.nemesis .nm{color:#ff5a6e;text-shadow:0 0 6px rgba(255,90,110,.45)}
+.card .traits{font-size:11px;color:var(--muted,#a79f8d);display:block;margin-top:2px}
 .party{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .party .card.down{opacity:.45}
 .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--brass)}
@@ -289,13 +291,56 @@ const randName=()=>randFirst()+' '+randSur();
 
 /* ======================= world ======================= */
 // arm: armour (armoured foes shrug off weak hits, so use big skills). dodge: % chance to avoid a hit.
-const FOES={
- present:[{name:'Clockwork Rat',hp:13,dmg:[2,5],arm:0,dodge:6,xp:5},{name:'Stalled Guard',hp:24,dmg:[3,8],arm:25,dodge:0,xp:10},
-  {name:'Ashen Townsfolk',hp:18,dmg:[2,7],arm:0,dodge:0,xp:7},{name:'Time-Torn Hound',hp:19,dmg:[3,8],arm:0,dodge:12,xp:9}],
- future:[{name:'Thornling',hp:14,dmg:[3,6],arm:0,dodge:5,xp:6},{name:'Mossback Boar',hp:26,dmg:[2,9],arm:10,dodge:0,xp:10},
-  {name:'Spore Wisp',hp:13,dmg:[3,6],arm:0,dodge:15,xp:6},{name:'Rootbound Sentinel',hp:22,dmg:[3,8],arm:30,dodge:0,xp:10}]
-};
-const ELITES={present:{name:'Warden of the Hour',hp:61,dmg:[4,13],arm:30,dodge:0,xp:40},future:{name:'Overgrown Colossus',hp:74,dmg:[4,14],arm:20,dodge:0,xp:45}};
+// The bestiary (v1 catalogue). Each creature is a profile against the Bonewalker (life, damage, armour multipliers),
+// then scaleFoe grows it with time survived and party level. era 'past' = Distant Echo rooms and chapels.
+const FOE_BASE={hp:18,dmg:[3,7],arm:10};
+const SPD_DODGE={fast:12,normal:5,slow:0};
+// [name, family, era, from loop, life, damage, armour, speed, ability, eliteOnly]
+const BESTIARY=[
+ ['Time-Torn Hound','beast','present',1,.95,.9,.5,'fast',''],
+ ['Thornback Boar','beast','present',1,1.35,1.2,1.15,'slow','charge'],
+ ['Ashen Spider','beast','present',1,1.0,.85,.85,'normal','poison'],
+ ['Emberling','arcane','present',2,.95,1.2,.65,'normal','burn'],
+ ['Spell Leech','arcane','present',4,1.05,1.0,.5,'fast','siphon'],
+ ['Bonewalker','undead','past',1,1.0,1.0,1.0,'slow',''],
+ ['Hollow Revenant','undead','past',3,1.8,1.45,1.5,'slow','rise'],
+ ['Wailing Soul','undead','past',3,.85,1.5,.15,'fast','fear'],
+ ['Chrono Mite','temporal','future',1,.65,.85,.35,'fast','thief'],
+ ['Echo Stalker','temporal','future',4,1.2,1.45,.85,'fast','echo'],
+ ['Loop Wraith','temporal','future',6,1.45,1.3,1.15,'normal','wraith'],
+ ['Time Devourer','temporal','future',8,3.1,2.0,2.0,'slow','feast',1],
+ ['Clockwork Rat','construct','future',1,.7,.85,.5,'fast','pack'],
+ ['Shard Golem','construct','future',7,2.3,1.5,2.2,'slow','mirror'],
+ ['Gloomling','abyssal','future',12,1.1,1.35,.65,'fast','shroud'],
+ ['Nightmare Hound','abyssal','future',15,1.6,1.95,1.0,'fast','frenzy']
+];
+// scaleFoe already grows enemies with party level, so the draft's late-game profiles are pulled halfway back towards 1 to avoid double scaling
+const soften=x=>x>1?1+(x-1)*.5:x;
+const CREATURES=BESTIARY.map(([name,fam,era,from,l,d,a,spd,ab,eliteOnly])=>({name,fam,era,from,ab,eliteOnly:!!eliteOnly,
+  hp:Math.round(FOE_BASE.hp*soften(l)),dmg:FOE_BASE.dmg.map(v=>Math.max(1,Math.round(v*soften(d)))),arm:Math.round(FOE_BASE.arm*soften(a)),dodge:SPD_DODGE[spd],
+  xp:Math.round(7*(l+d)/2+(SPD_DODGE[spd]?1:0))}));
+const FOE_BY_NAME=Object.fromEntries(CREATURES.map(c=>[c.name,c]));
+const FOES={present:CREATURES.filter(c=>c.era==='present'),future:CREATURES.filter(c=>c.era==='future'),past:CREATURES.filter(c=>c.era==='past')};
+const AB_SHORT={charge:'Charges',poison:'Poison',burn:'Burn',siphon:'Siphon',rise:'Rises once',fear:'Fear',thief:'Time thief',echo:'Echo',wraith:'Remembers',feast:'Feasts on time',pack:'Pack',mirror:'Mirror',shroud:'Shroud',frenzy:'Frenzy'};
+const ABILITY_INFO={charge:'Winds up, then charges for double damage',poison:'Poisons: lose life each round',burn:'Burns: lose life each round',
+ siphon:'Strips a buff or a Lily',rise:'Rises once, unless Time Bolt finishes it',fear:'Fear: your next action costs 2s more',thief:'Each hit steals 1s',
+ echo:'Repeats its last attack at half strength',wraith:'Remembers who it killed',feast:'Eats your time reward every round it lives',pack:'Hunts in packs',
+ mirror:'Reflects 25% of Time Bolt damage',shroud:'Hides in darkness, then ambushes',frenzy:'Attacks twice every other round'};
+// who you can meet right now: unlocked by loop
+function poolFor(era,loop,elite){return FOES[era].filter(c=>(loop||1)>=c.from&&(elite||!c.eliteOnly))}
+/* ranks and modifiers: Elite (1 modifier), Champion (2), Dread (3). Nemesis is earned through Enemy Memory, not rolled. */
+const RANKS={elite:{name:'Elite',hp:2,dmg:1.25,arm:1.2,mods:1,xp:2,shard:1},champion:{name:'Champion',hp:3,dmg:1.5,arm:1.35,mods:2,xp:3,shard:1.3},
+ dread:{name:'Dread',hp:4,dmg:1.65,arm:1.5,mods:3,xp:4,shard:1.6},nemesis:{name:'Nemesis',hp:1,dmg:1,arm:1,mods:0,xp:3,shard:1.5}};
+const MODS={brutal:['Brutal','+30% damage'],executioner:['Executioner','+40% damage against targets below 30% life'],volatile:['Volatile','Explodes on death'],
+ bloodthirsty:['Bloodthirsty','Heals 25% of the damage it deals'],armoured:['Armoured','+50% armour'],regenerating:['Regenerating','Heals 6% each round'],
+ reflective:['Reflective','Returns 15% of the damage it takes'],timewarped:['Time-Warped','Sometimes takes an extra turn'],echoing:['Echoing','Repeats its last attack at half strength'],
+ chronolocked:['Chrono-Locked','Immune to Slow and Rewind Turn']};
+function rollRank(loop){const r=Math.random();if(loop>=10&&r<.15)return 'dread';if(loop>=5&&r<.4)return 'champion';return 'elite'}
+function rankUp(f,rank){const R=RANKS[rank];f.rank=rank;f.maxHp=Math.round(f.maxHp*R.hp);f.hp=f.maxHp;f.dmg=f.dmg.map(v=>Math.max(1,Math.round(v*R.dmg)));f.arm=Math.round(f.arm*R.arm);f.xp=Math.round(f.xp*R.xp);
+  const keys=Object.keys(MODS).filter(k=>!(k==='echoing'&&f.ab==='echo')).sort(()=>Math.random()-.5).slice(0,R.mods);f.mods=keys;
+  if(keys.includes('armoured'))f.arm=Math.round(Math.max(f.arm,6)*1.5)}
+const hasMod=(f,k)=>!!(f.mods&&f.mods.includes(k));
+const ELITES={present:FOE_BY_NAME['Thornback Boar'],future:FOE_BY_NAME['Clockwork Rat']}; // old saves only
 const BOSSES=[{at:600,name:'The Belltower Revenant',era:'present',hp:136,dmg:[5,15],arm:30,dodge:0,xp:120,attacks:2,room:'The Belltower'},
               {at:1200,name:'The Verdant Matriarch',era:'future',hp:176,dmg:[6,16],arm:20,dodge:0,xp:160,attacks:2,room:'The Heart of the Grove'}];
 const PLACES={
@@ -506,7 +551,7 @@ function calc(c,gear){
 function armCut(arm,lvl){return Math.min(.75,arm/(arm+CFG.armK+CFG.armLvl*Math.max(1,lvl)))}
 function refresh(m){delete m.ac;delete m.hit;delete m.dmgB;delete m.crit;const s=calc(m,m.gear);const gain=s.maxHp-(m.maxHp||s.maxHp);Object.assign(m,s);if(!m.down)m.hp=Math.max(1,Math.min(m.maxHp,(m.hp??m.maxHp)+Math.max(0,gain)))}
 function hasSkill(m,key){return skillsOf(m).some(s=>s.key===key&&m.lvl>=s.lvl)}
-function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;if(act==='bolt'&&m.key==='hero')c=Math.max(1,c+(TF().boltCost||0));c*=1-(m.tempo||0)/100;if(A.heal)c*=1-(m.patient||0)/100;return Math.round(c*10)/10}
+function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;if(act==='bolt'&&m.key==='hero')c=Math.max(1,c+(TF().boltCost||0));c*=1-(m.tempo||0)/100;if(A.heal)c*=1-(m.patient||0)/100;if(m.feared)c+=2;return Math.round(c*10)/10}
 function nextXp(l){return 20+18*l}
 
 /* ======================= run engine (no DOM) ======================= */
@@ -563,13 +608,14 @@ function chooseDoor(st,dir){
     fillDoors(st,st.room);
     st.roomMsg=`${m.name} stops dead. "I've... been here before." Something is coming back to them.`;
     if(TF().echoCart){const before=st.roomMsg;treasureRoom(st);st.roomMsg=before+' '+st.roomMsg}
+    else if(Math.random()<.4){const pool=poolFor('past',M.loop);log(st,st.roomMsg);startFight(st,[pick(pool),pick(pool)].slice(0,1+(Math.random()<.5)),'reg');log(st,'Shapes from the past rise to stop you.')}
     return;
   }
   if(st.script===1){st.script=2;
     st.room={era:'present',name:'Market Square',desc:'Stalls frozen mid-sale. A dropped apple hangs in the air. Something moves beneath the market awning.',doors:{},entry:OPP[dir],type:'fight',insp:0};
     DIRS.filter(d=>d!==OPP[dir]).slice(0,2).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
     log(st,'You step forward. The world shifts around you.');
-    startFight(st,[FOES.present.find(f=>f.name==='Time-Torn Hound'),FOES.present.find(f=>f.name==='Clockwork Rat')],'reg');return}
+    startFight(st,[FOE_BY_NAME['Time-Torn Hound'],FOE_BY_NAME['Time-Torn Hound']],'reg');return}
   if(st.script===2){st.script=0;
     st.room={era:'present',name:'Fountain Court',desc:'The water stands still in a glass arc. A bird hangs motionless above the fountain. For a moment, you think you see someone standing on the opposite side.',doors:{},entry:OPP[dir],type:'quiet',insp:0};
     DIRS.filter(d=>d!==OPP[dir]).sort(()=>Math.random()-.5).slice(0,rnd(2,3)).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
@@ -582,14 +628,25 @@ function chooseDoor(st,dir){
   r.type=type;
   if(type==='fight'){
     const count=Math.min(st.party.length+1,1+(Math.random()<.5)+(m>8&&Math.random()<.4)+(m>18&&Math.random()<.3));
-    startFight(st,Array.from({length:count},()=>pick(FOES[r.era])),'reg');
+    startFight(st,fightLineup(st,r,count),'reg');
   }else if(type==='elite'){
-    startFight(st,[ELITES[r.era]].concat(m>12&&Math.random()<.5?[pick(FOES[r.era])]:[]),'elite');
+    const lead=pick(poolFor(r.era,M.loop,true));
+    startFight(st,[lead].concat(m>12&&Math.random()<.5?[pick(poolFor(r.era,M.loop))]:[]),'elite');
   }else if(type==='treasure'){treasureRoom(st);st.relicNext=true
   }else if(type==='shrine'){
     st.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.4))});st.relicNext=true;
     st.roomMsg='A quiet shrine. The living rest and recover 40% of their health.';
   }else st.roomMsg='Nothing here but the sound of a clock that is not there.';
+}
+// chapels let the Past bleed through; rats come in packs
+function fightLineup(st,r,count){
+  let pool=poolFor(r.era,M.loop);
+  if(/Chapel/.test(r.name)&&Math.random()<.6)pool=poolFor('past',M.loop);
+  const pickW=l=>{const w=l.map(c=>c.hp>FOE_BASE.hp*1.3?1:2),t=w.reduce((a,b)=>a+b,0);let r=Math.random()*t;for(let i=0;i<l.length;i++){r-=w[i];if(r<0)return l[i]}return l[0]};
+  const first=pickW(pool);
+  if(first.ab==='pack')return Array.from({length:Math.min(4,Math.max(3,count))},()=>first);
+  const rest=pool.filter(c=>c.ab!=='pack');
+  return [first].concat(Array.from({length:count-1},()=>rest.length?pickW(rest):first));
 }
 function treasureRoom(st){
   {const g=Math.round(rnd(CFG.dTreasMin,CFG.dTreasMax)*partyBonus(st)*timeMult(st));
@@ -604,19 +661,24 @@ function scaleFoe(st,base,tier){
   const m=minutes(st),L=avgLvl(st)-1;
   return {name:base.name,tier,maxHp:Math.max(1,Math.round(base.hp*(1+CFG.hpScale/100*m)*(1+CFG.lvlScale/100*L)*CFG.hpMult/100*(st.party.length===1?CFG.soloLife/100:1))),
     lvl:Math.max(1,Math.round(L+1+m/5)),arm:Math.round(base.arm*(1+CFG.armScale/100*m+.1*L)),dodge:base.dodge,
-    dmg:base.dmg.map(v=>Math.max(1,Math.round(v*(1+CFG.dmgScale/100*m+CFG.dmgLvl/100*L)))),xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at};
+    dmg:base.dmg.map(v=>Math.max(1,Math.round(v*(1+CFG.dmgScale/100*m+CFG.dmgLvl/100*L)))),xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at,ab:base.ab||'',rank:null,mods:[],rounds:0};
 }
 function startFight(st,bases,kind){
-  st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;return f});
+  st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;if(f.tier==='elite')rankUp(f,rollRank(M.loop));if(f.ab==='shroud')f.hidden=true;return f});
   const tf=TF();st.phase='combat';st.fight={spent:0,kind,relic:!!(tf.relic&&st.relicNext),free:!!(tf.archivist&&!st.firstFightDone)};st.relicNext=false;st.firstFightDone=true;st.snap=null;st.stats.fights++;
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false});
   st.turn=st.party.findIndex(p=>!p.down);
-  log(st,`${st.enemies.map(e=>e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
+  log(st,`${st.enemies.map(e=>(e.rank?RANKS[e.rank].name+' ':'')+e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
-function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);if(f.hp===0){log(st,`${f.name} falls.`);st.stats.kills++}}
+function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);if(f.hp>0)return;
+  if(f.ab==='rise'&&!f.rose){f.rose=true;if(st.curAct==='bolt'){log(st,`Time Bolt tears the soul out of ${f.name}. It will not rise again.`)}else{f.hp=Math.round(f.maxHp*.3);log(st,`${f.name} falls... then drags itself back up.`);return}}
+  log(st,`${f.name} falls.`);st.stats.kills++;
+  if(hasMod(f,'volatile')){const d=Math.max(1,Math.round(f.maxHp*.1));log(st,`${f.name} explodes! Everyone takes ${d}.`);
+    st.party.forEach(p=>{if(p.down)return;p.hp=Math.max(0,p.hp-d);bfx({k:'ehit',f,t:p,d});if(p.hp===0)fall(st,p,f.tier)})}}
 // pct: % of weapon damage. Hits always land unless the foe dodges. Returns damage dealt.
 function strike(st,a,f,pct,verb,critBonus,critDBonus){
-  if(Math.random()*100<f.dodge){log(st,`${f.name} dodges ${a.name}.`);bfx({k:'miss',a,f,txt:'dodge'});return 0}
+  const fDodge=f.hidden?50:f.exposed?0:f.dodge;
+  if(Math.random()*100<fDodge){log(st,`${f.name} ${f.hidden?'melts into the dark':'dodges '+a.name}.`);bfx({k:'miss',a,f,txt:'dodge'});return 0}
   const b=a.buff||{},tf=TF(),isH=a.key==='hero';
   let bonus=a.dmgPct+(b.dmg||0)+((st.buffs&&st.buffs.dmg)||0);
   if(tf.lastGrains&&st.timeLeft<60)bonus+=25;
@@ -626,6 +688,8 @@ function strike(st,a,f,pct,verb,critBonus,critDBonus){
   const arm=isH?Math.max(0,f.arm-(tf.sunder||0)):f.arm;
   d=Math.max(1,Math.round(d*(1-armCut(arm,a.lvl))));
   log(st,`${a.name} ${crit?'crits':verb||'hits'} ${f.name} for ${d}.`);hitFoe(st,f,d);bfx({k:'hit',a,f,d,crit});
+  {const back=(hasMod(f,'reflective')?.15:0)+(f.ab==='mirror'&&st.curAct==='bolt'?.25:0);
+    if(back&&!a.down){const r=Math.max(1,Math.round(d*back));a.hp=Math.max(0,a.hp-r);log(st,`${f.name} throws ${r} back at ${a.name}.`);bfx({k:'ehit',f,t:a,d:r});if(a.hp===0)fall(st,a,f.tier)}}
   if(isH&&f.hp===0){
     if(tf.chain){const o=st.enemies.filter(x=>x.hp>0);if(o.length){const t=pick(o),sd=Math.max(1,Math.round(d*.3));log(st,`The blow carries on into ${t.name} for ${sd}.`);hitFoe(st,t,sd);bfx({k:'hit',a,f:t,d:sd})}}
     if(tf.survivor){const h=Math.max(1,Math.round(a.maxHp*.05));a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}
@@ -642,7 +706,7 @@ function canUse(st,act){
   if(act==='potion')return st.items.potion>0&&st.party.some(p=>!p.down&&p.hp<p.maxHp);
   if(act==='phoenix')return st.items.phoenix>0&&st.party.some(p=>p.down);
   if(act==='stopwatch')return (st.items.stopwatch||0)>0&&!st.freeNext;
-  if(act==='rturn')return !!st.snap&&!(st.fight&&st.fight.rewound);
+  if(act==='rturn')return !!st.snap&&!(st.fight&&st.fight.rewound)&&!st.enemies.some(f=>f.hp>0&&hasMod(f,'chronolocked'));
   if(act==='smoke')return (st.items.smoke||0)>0&&!(st.fight&&st.fight.kind==='boss');
   const m=st.party[st.turn];
   if(act==='lily')return !!m&&(m.lilies||0)>0;
@@ -657,7 +721,7 @@ function act(st,act,ti){
   if(A.target==='ally'&&(!ally||ally.down))return;
   if(A.target==='downed'&&(!ally||!ally.down))return;
   if(!canUse(st,act))return;
-  let c=costOf(a,act);const live=()=>st.enemies.filter(f=>f.hp>0);
+  let c=costOf(a,act);const live=()=>st.enemies.filter(f=>f.hp>0);st.curAct=act;if(a.feared)a.feared=false;
   if(st.freeNext&&act!=='stopwatch'){c=0;st.freeNext=false}
   const HS=['bolt','rewind','slow','rturn'];
   if(a.key==='hero'&&st.artificer&&HS.includes(act)){c=Math.round(c*5)/10;st.artificer=false}
@@ -667,7 +731,7 @@ function act(st,act,ti){
     case 'bolt':{const tf=TF();const pct=280*(1+((tf.boltDmg||0)+(tf.heroSkill||0))/100);strike(st,a,foe,pct,'blasts',0,tf.boltCritD||0);
       if(tf.echoBolt&&Math.random()<.25){const o=st.enemies.filter(x=>x.hp>0&&x!==foe);if(o.length)strike(st,a,pick(o),pct/2,'echoes into')}
       if(tf.artificer&&foe.hp===0)st.artificer=true;break}
-    case 'slow':foe.slowed=true;bfx({k:'buff',a,t:a,txt:'slow'});log(st,`${a.name} slows ${foe.name}. Its next attack will be weaker.`);break;
+    case 'slow':if(hasMod(foe,'chronolocked')){log(st,`${foe.name} is locked in its own time. Slow has no effect.`);break}foe.slowed=true;bfx({k:'buff',a,t:a,txt:'slow'});log(st,`${a.name} slows ${foe.name}. Its next attack will be weaker.`);break;
     case 'rturn':{st.fight.rewound=true;const sn=st.snap;st.party.forEach((p,i)=>{if(!sn[i])return;p.hp=sn[i].hp;p.down=sn[i].down;if(!p.down)p.downAt=null});st.snap=null;
       bfx({k:'buff',a,txt:'rewind'});log(st,`${a.name} turns the moment back. The last round never happened.`);break}
     case 'smite':{const d=strike(st,a,foe,230,'smites');if(d){const h=Math.ceil(d*.3);a.hp=Math.min(a.maxHp,a.hp+h);bfx({k:'heal',a,t:a,h})}break}
@@ -689,7 +753,9 @@ function act(st,act,ti){
     case 'potion':{st.items.potion--;const h=Math.round((Math.round(ally.maxHp*.4)+4)*(1+(TF().potionHeal||0)/100));ally.hp=Math.min(ally.maxHp,ally.hp+h);bfx({k:'heal',a,t:ally,h});log(st,`${ally.name} drinks a potion: +${h}.`);break}
     case 'phoenix':st.items.phoenix--;ally.down=false;ally.hp=Math.ceil(ally.maxHp*.4);bfx({k:'heal',a,t:ally,h:ally.hp,rev:1});log(st,`A Phoenix Down brings ${ally.name} back.`);break;
   }
+  st.curAct=null;
   if(!spend(st,c,'act'))return;
+  if(a.down&&st.party.every(p=>p.down)){end(st,'wipe');return}
   if(st.enemies.every(f=>f.hp<=0)){winFight(st);return}
   advance(st);
 }
@@ -701,20 +767,54 @@ function advance(st){
   if(i>=st.party.length){enemyPhase(st);if(st.phase!=='combat')return;i=st.party.findIndex(p=>!p.down)}
   st.turn=i;startTurn(st,i);
 }
+function enemyHit(st,f,t,mult,label){
+  if(Math.random()*100<t.dodge){log(st,`${t.name} dodges ${f.name}.`);bfx({k:'emiss',f,t,txt:'dodge'});return 0}
+  let dmg=rnd(f.dmg[0],f.dmg[1])*(mult||1);const crit=Math.random()<.05;if(crit)dmg*=1.5;
+  if(hasMod(f,'brutal'))dmg*=1.3;if(hasMod(f,'executioner')&&t.hp<t.maxHp*.3)dmg*=1.4;
+  if(f.ab==='wraith'&&M&&M.wraith&&M.wraith.includes(t.id))dmg*=1.25;
+  dmg*=1-armCut(t.arm+((st.buffs&&st.buffs.arm)||0),f.lvl);if(t.defending)dmg*=Math.max(.1,1-(CFG.defendCut+(t.key==='hero'?(TF().defend||0):0))/100);if(f.slowed){dmg*=.5;f.slowed=false}if(st.fight&&st.fight.relic)dmg*=.8;dmg=Math.max(1,Math.round(dmg));
+  t.hp=Math.max(0,t.hp-dmg);log(st,`${f.name} ${label||(crit?'crits':'hits')} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit});
+  if(hasMod(f,'bloodthirsty')&&f.hp>0){const h=Math.max(1,Math.round(dmg*.25));f.hp=Math.min(f.maxHp,f.hp+h)}
+  // on-hit abilities
+  if(f.ab==='poison'||f.ab==='burn'){const d=f.ab==='poison'?{k:'poison',pct:4,rounds:3}:{k:'burn',pct:5,rounds:2};t.dots=(t.dots||[]).filter(x=>x.k!==d.k);t.dots.push(d)}
+  if(f.ab==='fear'&&!t.feared){t.feared=true;log(st,`${t.name} is shaken. Their next action will take longer.`)}
+  if(f.ab==='thief'){st.timeLeft=Math.max(0,st.timeLeft-1);st.stats.stolen=(st.stats.stolen||0)+1;log(st,`${f.name} nibbles a second off your clock.`)}
+  if(f.ab==='siphon')siphon(st,f,t);
+  if(f.ab==='echo'||hasMod(f,'echoing'))f.echoNext={id:t.id,d:Math.max(1,Math.round(dmg/2))};
+  if(t.hp===0){if(f.ab==='wraith'&&t.key!=='hero'&&M){M.wraith=M.wraith||[];if(!M.wraith.includes(t.id))M.wraith.push(t.id)}fall(st,t,f.tier)}
+  return dmg;
+}
+function siphon(st,f,t){
+  if(t.buff){t.buff=null;log(st,`${f.name} drains ${t.name}'s inspiration away.`);return}
+  if((t.lilies||0)>0){t.lilies--;log(st,`${f.name} drinks a Lily from ${t.name} (${t.lilies}/3).`);return}
+  if(st.buffs&&(st.buffs.dmg||st.buffs.arm)){const k=st.buffs.dmg?'dmg':'arm';delete st.buffs[k];log(st,`${f.name} siphons away your ${k==='dmg'?'Whetstone edge':'Ward Charm'}.`)}
+}
+function tickDots(st){
+  for(const p of st.party){if(p.down||!p.dots||!p.dots.length)continue;
+    for(const d of p.dots){const dmg=Math.max(1,Math.round(p.maxHp*d.pct/100));p.hp=Math.max(0,p.hp-dmg);log(st,`${p.name} takes ${dmg} from ${d.k==='poison'?'poison':'burning'}.`);bfx({k:'buff',a:p,t:p,txt:`${d.k} −${dmg}`});d.rounds--;if(p.hp===0){fall(st,p,'reg');break}}
+    p.dots=(p.dots||[]).filter(d=>d.rounds>0&&!p.down)}
+}
 function enemyPhase(st){
   st.snap=st.party.map(p=>({hp:p.hp,down:p.down}));
+  tickDots(st);
+  if(st.party.every(p=>p.down)){end(st,'wipe');return}
   for(const f of st.enemies){
     if(f.hp<=0)continue;
-    for(let k=0;k<f.attacks;k++){
-      const live=st.party.filter(p=>!p.down);if(!live.length)break;
-      const taunter=live.find(p=>p.taunting);
-      const t=taunter||pick(live);
-      if(Math.random()*100<t.dodge){log(st,`${t.name} dodges ${f.name}.`);bfx({k:'emiss',f,t,txt:'dodge'});continue}
-      let dmg=rnd(f.dmg[0],f.dmg[1]);const crit=Math.random()<.05;if(crit)dmg*=1.5;
-      dmg*=1-armCut(t.arm+((st.buffs&&st.buffs.arm)||0),f.lvl);if(t.defending)dmg*=Math.max(.1,1-(CFG.defendCut+(t.key==='hero'?(TF().defend||0):0))/100);if(f.slowed){dmg*=.5;f.slowed=false}if(st.fight&&st.fight.relic)dmg*=.8;dmg=Math.max(1,Math.round(dmg));
-      t.hp=Math.max(0,t.hp-dmg);log(st,`${f.name} ${crit?'crits':'hits'} ${t.name} for ${dmg}.`);bfx({k:'ehit',f,t,d:dmg,crit});
-      if(t.hp===0)fall(st,t,f.tier);
-    }
+    f.rounds++;
+    if(hasMod(f,'regenerating')&&f.hp<f.maxHp){const h=Math.max(1,Math.round(f.maxHp*.06));f.hp=Math.min(f.maxHp,f.hp+h);log(st,`${f.name} knits itself back together (+${h}).`)}
+    f.exposed=false;
+    const live=()=>st.party.filter(p=>!p.down);const target=()=>{const l=live();return l.find(p=>p.taunting)||pick(l)};
+    if(f.echoNext){const t=st.party.find(p=>p.id===f.echoNext.id);const d=f.echoNext.d;f.echoNext=null;
+      if(t&&!t.down){t.hp=Math.max(0,t.hp-d);log(st,`An echo of ${f.name}'s last attack hits ${t.name} for ${d}.`);bfx({k:'ehit',f,t,d});if(t.hp===0)fall(st,t,f.tier)}}
+    if(!live().length)break;
+    // Boar: wind up, then charge
+    if(f.ab==='charge'){if(f.charging){f.charging=false;const t=target();enemyHit(st,f,t,2,'charges into');continue}
+      if(Math.random()<.35){f.charging=true;log(st,`${f.name} lowers its head and paws the ground. It's about to charge!`);bfx({k:'buff',a:f,t:f,txt:'charging'});continue}}
+    // Gloomling: lurk, then ambush
+    if(f.ab==='shroud'){if(f.hidden){f.hidden=false;f.exposed=true;const t=target();enemyHit(st,f,t,1.5,'ambushes');continue}
+      f.hidden=true;log(st,`${f.name} sinks back into the darkness.`);continue}
+    let n=f.attacks;if(f.ab==='frenzy'&&f.rounds%2===0)n++;if(hasMod(f,'timewarped')&&Math.random()<.25){n++;log(st,`Time stutters around ${f.name}. It moves again.`)}
+    for(let k=0;k<n;k++){if(!live().length)break;enemyHit(st,f,target())}
   }
   if(st.party.every(p=>p.down))end(st,'wipe');
 }
@@ -725,9 +825,13 @@ function winFight(st){
   const L=Math.round(avgLvl(st));
   for(const f of st.enemies){
     const [lo,hi]=f.tier==='boss'?[CFG.dBossMin,CFG.dBossMax]:f.tier==='elite'?[CFG.dEliteMin,CFG.dEliteMax]:[CFG.dRegMin,CFG.dRegMax];
-    earned+=rnd(lo,hi)*(f.tier==='boss'&&TF().archivist?1.25:1);xp+=f.xp;
+    const R=f.rank?RANKS[f.rank]:null;
+    earned+=rnd(lo,hi)*(f.tier==='boss'&&TF().archivist?1.25:1)*(R?R.shard:1)*(1+.1*(f.mods?f.mods.length:0))*(f.ab==='feast'?Math.max(.3,1-.1*f.rounds):1);xp+=f.xp;
     if(f.tier==='boss'){drops.push(makeItem(L+rnd(0,2),'rare'),makeItem(L+rnd(0,2),'uncommon'));cry+=rnd(2,3)}
-    else if(f.tier==='elite'){drops.push(makeItem(L+rnd(0,2),'uncommon'));if(Math.random()<.5)cry+=1}
+    else if(f.tier==='elite'){const rk=f.rank||'elite';
+      if(rk==='dread'){drops.push(makeItem(L+rnd(0,2),Math.random()<.5?'rare':'uncommon'),makeItem(L+rnd(0,2),'uncommon'));cry+=2}
+      else if(rk==='champion'){drops.push(makeItem(L+rnd(0,2),Math.random()<.35?'rare':'uncommon'));cry+=rnd(1,2)}
+      else{drops.push(makeItem(L+rnd(0,2),'uncommon'));if(Math.random()<.5)cry+=1}}
     else if(Math.random()*100<CFG.dropReg+(TF().drop||0)+loneMult(st))drops.push(makeItem(L+rnd(-2,2)));
   }
   if(Math.random()*100<CFG.crystalReg)cry+=1;
@@ -743,7 +847,7 @@ function winFight(st){
   const net=earned-st.fight.spent,s=st.stats;
   if(s.best===null||net>s.best)s.best=net;if(s.worst===null||net<s.worst)s.worst=net;
   st.sum={gold,over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry};
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false});
   if(M&&M.flags)M.flags.tutorialDone=true;
   st.enemies=[];st.fight=null;st.phase='summary';
 }
@@ -846,13 +950,13 @@ function policy(st){
   if(hasSkill(a,'firebolt')&&foes.length>=2)return['firebolt',null];
   if(window.__spam)return['attack',weak.i];
   for(const k of ['backstab','smite','firebolt','flurry'])if(hasSkill(a,k)&&(big.f.tier!=='reg'||big.f.hp>25||big.f.arm>0))return[k,big.i];
-  if(hasSkill(a,'bolt')&&(big.f.tier!=='reg'||big.f.arm>0||big.f.hp>30))return['bolt',big.i];
+  if(hasSkill(a,'bolt')&&big.f.ab!=='mirror'&&(big.f.tier!=='reg'||big.f.arm>0||big.f.hp>30))return['bolt',big.i];
   return['attack',weak.i];
 }
 function autoEquip(st){st.party.forEach((m,mi)=>{st.bag.filter(it=>it.lvl<=m.lvl).forEach(it=>{const cur=m.gear[it.slot];if(!cur||power(it.stats)>power(cur.stats))equip(st,mi,it.id)})})}
-function simRun(keys,lvl,gear){
+function simRun(keys,lvl,gear,loop){
   const saveM=M,saveS=S;
-  M={loop:1,crystals:0,freeHires:0,chars:[],party:[],fallen:[],tavern:[],events:[]};
+  M={loop:loop||1,crystals:0,freeHires:0,chars:[],party:[],fallen:[],tavern:[],events:[]};
   const h=newChar('hero','Sim',lvl);M.chars.push(h);
   keys.forEach(k=>{const c=newChar(k,k,lvl);M.chars.push(c);M.party.push(c.id)});
   startRun(false);let g=0;
@@ -937,7 +1041,10 @@ const SPR={
  rat:["......kk..",".....kkek.","kkkgkkkkkk",".kkggkkkk.",".k.k..k.k."],
  thorn:["..g..g..",".gGggGg.","gGGgGGGg","gGeGGeGg",".gGGGGg.","..gGGg..","..b..b..",".bb..bb."],
  boar:["....mmmm......","..mmmmmmmmk...","..kkkkkkkkkkkk",".kkkkkkkkkkekk",".kkkkkkkkkkkkw","..kkkkkkkkkk..","..kk.kk..kk...","..k..k...kk...",".kk.kk...k...."],
- wisp:["..ggg..",".gGGGg.","gGeGeGg","gGGGGGg",".gGGGg.","..g.g..",".g...g."]
+ wisp:["..ggg..",".gGGGg.","gGeGeGg","gGGGGGg",".gGGGg.","..g.g..",".g...g."],
+ spider:["..k........k..","...k.kkkk.k...","k...kkkkkk...k",".kkkkekkekkkk.","k..kkkkkkkk..k","..k..kkkk..k..",".k..k....k..k."],
+ mite:["..c..c..","...cc...",".kkkkkk.","kkekkekk",".k.k.k.k"],
+ leech:["....gggg....","..gggggggg..",".ggeggggGGg.","gggggggGGGgg",".g.g.g.g.g.."]
 };
 const GREY={h:'#5a5468',s:'#8a8698',e:'#e0ae52',a:'#4a4458',b:'#3a3547',w:'#7a7690',o:'#2b2230',t:'#5a4632',g:'#e0ae52'};
 const FOE_LOOK={
@@ -951,6 +1058,20 @@ const FOE_LOOK={
  'Rootbound Sentinel':{s:'paladin',flip:1,p:{h:'#4a6a3a',s:'#8a6a4a',e:'#b5e08a',a:'#6b4a2a',b:'#4a7a3a',w:'#7a8a5a',o:'#3a2a1a'}},
  'Warden of the Hour':{s:'paladin',flip:1,big:1,warp:1,p:{s:'#9a96a4',e:'#e24b4a',a:'#7a6a4a',b:'#e0ae52',w:'#c8b88a',o:'#2b2230'}},
  'Overgrown Colossus':{s:'warrior',flip:1,big:1,p:{s:'#7a5a3a',e:'#b5e08a',a:'#4a6a3a',b:'#6b4a2a',w:'#5a7a4a',o:'#2a3a1a'}},
+ 'Thornback Boar':{s:'boar',p:{k:'#5a3f2e',m:'#7a8a3a',e:'#e24b4a',w:'#ece3cc'}},
+ 'Ashen Spider':{s:'spider',p:{k:'#5a5468',e:'#e24b4a'}},
+ 'Emberling':{s:'wisp',float:1,p:{g:'#c0603a',G:'#f0c27a',e:'#16141d'}},
+ 'Spell Leech':{s:'leech',p:{g:'#5a4a7a',G:'#d7a6ff',e:'#f2d27a'}},
+ 'Bonewalker':{s:'warrior',flip:1,p:{w:'#d8d0bc',e:'#e24b4a',s:'#d8d0bc',a:'#8a826e',b:'#5a5448',o:'#3a3530'}},
+ 'Hollow Revenant':{s:'paladin',flip:1,warp:1,p:{w:'#bdb5a0',e:'#8fd3d0',s:'#bdb5a0',a:'#4a4458',b:'#2b2230',o:'#16141d'}},
+ 'Wailing Soul':{s:'wisp',float:1,warp:1,p:{g:'#9a96a4',G:'#ece3cc',e:'#16141d'}},
+ 'Chrono Mite':{s:'mite',p:{k:'#2a5a6a',e:'#e0ae52',c:'#8fd3d0'}},
+ 'Echo Stalker':{s:'hound',warp:1,p:{k:'#2a5a6a',e:'#ece3cc',c:'#8fd3d0'}},
+ 'Loop Wraith':{s:'mage',flip:1,float:1,warp:1,p:{h:'#3f3a52',s:'#9a96a4',e:'#8fd3d0',a:'#3f3a52',b:'#8fd3d0',t:'#2b2230',g:'#8fd3d0',o:'#16141d'}},
+ 'Time Devourer':{s:'boar',big:1,warp:1,p:{k:'#2b2230',m:'#5a4a7a',e:'#e0ae52',w:'#8fd3d0'}},
+ 'Shard Golem':{s:'warrior',flip:1,big:1,p:{w:'#8fd3d0',e:'#ece3cc',s:'#5aa8b0',a:'#3a7a8a',b:'#2a5a6a',o:'#16141d'}},
+ 'Gloomling':{s:'thorn',p:{g:'#1d1a26',G:'#3f3a52',e:'#d7a6ff',b:'#16141d'}},
+ 'Nightmare Hound':{s:'hound',p:{k:'#2b2230',e:'#e24b4a',c:'#7a2a2a'}},
  'The Belltower Revenant':{s:'mage',flip:1,big:1,warp:1,p:{h:'#2a2638',s:'#9a96a4',e:'#e24b4a',a:'#3f3a52',b:'#e0ae52',t:'#5a4632',g:'#e24b4a',o:'#16141d'}},
  'The Verdant Matriarch':{s:'cleric',flip:1,big:1,p:{h:'#3a6a2a',s:'#c8a888',e:'#f2d27a',a:'#4a7a3a',b:'#b5e08a',t:'#6b4a2a',g:'#b5e08a',o:'#2a3a1a'}}
 };
@@ -1238,7 +1359,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.5.1';
+const GAME_VERSION='0.6.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1284,7 +1405,7 @@ function renderMenu(){
 }
 /* the menu backdrop: the party facing a Stalled Guard and a Time-Torn Hound */
 const MENU_PARTY=[{key:'hero',id:'h'},{key:'paladin',id:'p1',colour:'#e39ac7'},{key:'ranger',id:'r2',colour:'#b5e08a'},{key:'mage',id:'m3',colour:'#8fd3d0'}];
-const MENU_FOES=[{name:'Stalled Guard',hp:1,maxHp:1},{name:'Time-Torn Hound',hp:1,maxHp:1},{name:'Clockwork Rat',hp:1,maxHp:1}];
+const MENU_FOES=[{name:'Bonewalker',hp:1,maxHp:1},{name:'Time-Torn Hound',hp:1,maxHp:1},{name:'Clockwork Rat',hp:1,maxHp:1}];
 function drawMenuArt(cv){
   const g=cv.getContext('2d');g.imageSmoothingEnabled=false;const f=BAT.frame;
   g.drawImage(BAT.bg.present||(BAT.bg.present=makeBg('present')),0,0);
@@ -1633,9 +1754,10 @@ function roomView(){
 }
 function fightView(){
   const a=S.party[S.turn],p=UI.pending,pt=p?ACTIONS[p].target:null;
-  const foes=S.enemies.map((f,i)=>`<button class="card ${f.hp<=0?'dead':''} ${f.tier!=='reg'?'elite':''} ${pt==='enemy'&&f.hp>0?'target':''}" data-foe="${i}" ${f.hp<=0?'disabled':''}>
-      ${f.tier!=='reg'?`<span class="tag">${f.tier==='boss'?'Mini-boss':'Elite'}</span>`:''}
-      <span class="nm">${esc(f.name)}</span><span class="sub">${f.hp}/${f.maxHp} life${f.arm?` · ${Math.round(armCut(f.arm,a.lvl)*100)}% armour`:''}${f.dodge?` · ${f.dodge}% dodge`:''}</span><span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`).join('');
+  const foes=S.enemies.map((f,i)=>{const traits=[f.ab&&AB_SHORT[f.ab]].concat((f.mods||[]).map(k=>MODS[k][0])).filter(Boolean);
+    return `<button class="card ${f.hp<=0?'dead':''} ${f.tier!=='reg'?'elite':''} ${f.rank==='nemesis'?'nemesis':''} ${pt==='enemy'&&f.hp>0?'target':''}" data-foe="${i}" ${f.hp<=0?'disabled':''} title="${esc([f.ab?ABILITY_INFO[f.ab]:''].concat((f.mods||[]).map(k=>MODS[k][0]+': '+MODS[k][1])).filter(Boolean).join(' · '))}">
+      ${f.tier!=='reg'||f.rank?`<span class="tag">${f.tier==='boss'?'Mini-boss':f.rank?RANKS[f.rank].name:'Elite'}</span>`:''}
+      <span class="nm">${esc(f.name)}</span><span class="sub">${f.hp}/${f.maxHp} life${f.arm?` · ${Math.round(armCut(f.arm,a.lvl)*100)}% armour`:''}${f.dodge?` · ${f.dodge}% dodge`:''}</span>${f.hidden?' · hidden':''}${f.charging?' · charging!':''}</span>${traits.length?`<span class="traits">${traits.join(' · ')}</span>`:''}<span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`}).join('');
   let acts;
   if(p){acts=`<div class="note">${{enemy:'Tap an enemy',ally:'Tap an ally in your party',downed:'Tap a fallen ally',sacrifice:'Tap a companion to sacrifice'}[pt]}.</div><button class="btn" data-a="cancel">Cancel</button>`}
   else{
@@ -1657,7 +1779,7 @@ function partyView(){
   return note+`<section class="party" aria-label="Your party">${S.party.map((m,i)=>{
     const tgt=(t==='ally'&&!m.down)||(t==='downed'&&m.down)||(t==='sacrifice'&&!m.down&&m.key!=='hero');
     return `<button class="card ${m.down?'down':''} ${S.phase==='combat'&&i===S.turn&&!p?'active':''} ${tgt?'target':''}" data-ally="${i}" ${tgt?'':'tabindex="-1"'}>
-      <span class="nm" style="color:${m.stranger||m.key==='hero'?'inherit':m.colour}">${esc(m.name)}</span><span class="sub">${CLASSES[m.key].cls} · Lv ${m.lvl}${m.taunting?' · taunting':''}${m.defending?' · bracing':''}${m.down?' · down':''}</span>
+      <span class="nm" style="color:${m.stranger||m.key==='hero'?'inherit':m.colour}">${esc(m.name)}</span><span class="sub">${CLASSES[m.key].cls} · Lv ${m.lvl}${m.taunting?' · taunting':''}${m.defending?' · bracing':''}${m.down?' · down':''}${(m.dots||[]).map(d=>' · '+(d.k==='poison'?'poisoned':'burning')).join('')}${m.feared?' · shaken':''}</span>
       <span class="sub">${m.hp}/${m.maxHp} life · XP ${m.xp}/${nextXp(m.lvl)}</span><span class="hp"><i style="width:${m.hp/m.maxHp*100}%"></i></span></button>`}).join('')}</section>
     <div class="small" style="text-align:center">${S.party.length===1?'Solo':S.party.length+' in party'} (×${partyBonus(S)} drops) · Gold this run: ${S.gold||0} · Crystals: ${S.crystals}</div>`;
 }
@@ -1952,7 +2074,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.5.1",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.6.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

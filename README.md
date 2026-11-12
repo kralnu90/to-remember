@@ -20,6 +20,14 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.0 · 12 November 2026
+- **The bestiary, v1:** 16 creatures across six families replace the old enemy list. New ones unlock as the loops go on, up to the Abyssal family from loop 12
+- Every creature has its own trick: the Boar charges, Spiders poison, Emberlings burn, Wailing Souls shake your nerve, Chrono Mites steal seconds off your clock, Revenants rise again unless Time Bolt finishes them, Shard Golems throw Time Bolt back at you, and more
+- **The Past bleeds through:** undead now haunt chapels, and can rise in Distant Echo rooms
+- **Enemy ranks:** Elite rooms now roll an Elite, a Champion (from loop 5) or a Dread (from loop 10), with 1, 2 or 3 modifiers like Brutal, Volatile or Chrono-Locked. Higher ranks pay out better loot and crystals
+- Battle cards show each enemy's rank, trick and modifiers. A Nemesis's name glows red (ready for the Nemesis system)
+- Poison, burning and fear show on your party's cards
+
 ### 0.5.1 · 11 November 2026
 - The Tavern now always has a Cleric (the healer) and a tank among each loop's recruits
 - The General Store's stock rotates: Potions and Phoenix Downs are always in, plus three of the five supplies, changing every loop
