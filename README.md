@@ -20,6 +20,12 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.5 · 12 November 2026
+- **New battle backdrops:** fights now take place in front of the room you're in, redrawn in the same lit pixel art as the hamlet and the dungeon
+- The present is a moonlit street with lamplight, glowing windows and the frozen clocktower (a bell tower in the chapels). The future is the same street lost to moss, roots and glowing fungi. Distant Echoes are tinted ghostly blue, with mist drifting across the ground
+- Behind the fight you'll see the place itself: the market stall, the fountain, the mill wheel, the cold forge, the inn, or the great tree in the Heart of the Grove
+- The main menu uses the new Market Square backdrop
+
 ### 0.6.4 · 12 November 2026
 - **Pixel-art dungeon rooms:** every room is now a torch-lit chamber with real doors in its walls, and a sign by each door showing what you know about it
 - Floors change with the era: worn cobbles in the present, cracked, mossy, root-split stone in the future, and a ghostly blue in Distant Echoes, where the door you're drawn to shimmers in your companion's colour
