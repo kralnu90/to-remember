@@ -20,6 +20,10 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.1 · 12 November 2026
+- **Talking portraits:** the wizard, the tavern keeper and every companion you hire now speak from a pixel-art portrait that moves its mouth as they talk
+- 14 portraits are ready for the story: the hero, the wizard, the tavern keeper, one for each class, a shadow for speaking enemies and Nemeses, and the two final bosses
+
 ### 0.6.0 · 12 November 2026
 - **The bestiary, v1:** 16 creatures across six families replace the old enemy list. New ones unlock as the loops go on, up to the Abyssal family from loop 12
 - Every creature has its own trick: the Boar charges, Spiders poison, Emberlings burn, Wailing Souls shake your nerve, Chrono Mites steal seconds off your clock, Revenants rise again unless Time Bolt finishes them, Shard Golems throw Time Bolt back at you, and more
