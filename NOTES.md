@@ -18,6 +18,7 @@ Upload this file at the start of a new session so Claude can pick up where we le
 2. Add a changelog entry to `README.md`.
 3. Players see a "new version ready" notice. The menu's "Get the latest version" button forces a fresh copy.
 4. Only bump `VERSION` in `sw.js` if icons or the manifest change.
+5. **Every release, also update the hub** (repo `kralnu90/kralnu90.github.io`, Kris asked for this): add a post to the top of `news.json` (type `update`, game `30 × to Remember`), bump the version fact on the WIP card in `wip/index.html`, and refresh its feature list or `to-remember.jpg` screenshot when they go out of date.
 
 ## How the game is built (key systems)
 - **Saves:** `localStorage` keys `t2r-meta2` (between loops, `M`), `t2r-run2` (current run, `S`), `t2r-tune` (tuning numbers), `t2r-settings` (`SET`), `t2r-rv-name`.
