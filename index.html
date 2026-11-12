@@ -1232,6 +1232,14 @@ const SPR={
  mite:["..c..c..","...cc...",".kkkkkk.","kkekkekk",".k.k.k.k"],
  leech:["....gggg....","..gggggggg..",".ggeggggGGg.","gggggggGGGgg",".g.g.g.g.g.."]
 };
+// Hi-res versions (since 0.6.6): twice the detail, same palette letters. UPPERCASE = a darker shade of that letter's
+// colour ('G' stays its own colour), '#' = outline. drawSpr swaps them in automatically. Source: tools/sprites_hd.py.
+const SPR_HD={"hero":["......#..#..#.......",".....#h##h##h##.....","....#hhhhhhhhHH#....","....#hhhhhhhhHH#....","....#hhhhhhhhHHH#...","#...#hhsssshhHH#....","w#...#s#ssshhHH#....","wW#.#ssessshhHH#....","wW#.#sssssshhHH#....","wW#..#ssssshhHH#....","wW#..#sssssSSA###...","wW#.#bbbbbbbbbbAA#..","wW###aaaggaaAAAAA#..","wWaaaaaabbaaAAAAA#..","wWaaaaaaggaaAAAAA#..","wWaaaaaaaaaaAAAAA#..","bbbsaaaaaaaaAAAAA#..","#sss#aaaaaaaAAAAA#..",".####bbbbgbbbbbAAA#.","....#bbbbbbbbbbAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.","....#oooo#oooo####..","....#oooo#oooo#.....","....#oooo#oooo#....."],"warrior":[".....####ww####.....","....#wwwwwwwWWW#....","....#wwwwwwwWWW#...#","....#wwwwwwwWWW#..#W","....#wwwwWwwWWW#..#W","....#wsssWsSWWW#..#W","....#wsssWsSWWW#..#W","....#ws#sWsSWWW#.#WW","..###wsesssSWWW#.#WW",".#bbbwsssssSWWW###WW","#bBwBbsssssSWWWWWWWW","bBBwBBbwwwwwWWWWWWWW","bBBwBBbwwwwwWWWWWWW#","BBwwwBBbaaaaaAAA##W#","BBwwwBBbaaaaaAAA##W#","BBwwwBBbaaaaaAAA#WW#","BBwwwBBbaaaaaAAA#WW#","BBwwwBBbaaaaaAAAbbb#","bBBwBBbbbbbbbbbbbbb#","bBBwBBbbbbbbbbbb###.","#bBwBbaa####AAA#....",".#bbbaaa#..#AAA#....","..###aaa#..#AAA#....","....#aaa#..#AAA#....","....#aaa#..#AAA#....","...#oooo#.#oooo#....","...#oooo#.#oooo#....","...#oooo#.#oooo#...."],"paladin":[".....###bbbb###.....","....#wwwbbbbWWW#....","....#wwwwwwwWWW#....","....#bbbbbbbbbb#....","....#wwwwwwwWWW#####","....#wsssssSWWW#bbbb","....#wsssssSWWW#bbbb","....#ws#sssSWWWbbbbb","#####wsesssSWWW#bbbb","wwwwwwsssssSWWW#bbbb","wbbbbwsssssSWWW##tt#","wbwwbwwwwwwwWWWW#tt#","wbwwbwwwwbbwWWWW#tt#","wbwwbwaabbbbaAAA#tt#","wwwwwwaabbbbaAAA#tt#","wwwwwwaabbbbaAAA#tt#","wbwwbwaabbbbaAAA#tt#","wbwwbwaabbbbaAAA#tt#","WbWWbWbbbbbbbbbb#tt#","WbWWbWbbbbbbbbbb#tt#","WbWWbWaa####AAA#.##.","WbbbbWaa#..#AAA#....","WWWWWWaa#..#AAA#....","#####aaa#..#AAA#....","....#aaa#..#AAA#....","...#oooo#.#oooo#....","...#oooo#.#oooo#....","...#oooo#.#oooo#...."],"cleric":["....................","################....","gggghhhhhhhhhHHH#...","gwgghhhhhhhhhHHH#...","ggggghhhhhhhhHHH#...","gggghhsssssShHHH#...","gggghhsssssShHHH#...","#tT#hhs#sssShHHH#...","#tT#hhsesssShHHH#...","#tT#hhsssssShHHH#...","#tT###sssssShHHH#...","#tT#.#aaabbahHHH#...","#tT#.#aaabbahHHH#...","#tT##aaaabbahHHH#...","#tsssaaaabbaaA##....","#tsssaaaabbaaA#.....","#tT##aaaabbaaA#.....","#tT##bbbbbbbbbb#....","#tT#abbbbbbbbbb#....","#tT#aaaaabbaaAA#....","#tT#aaaaabbaaAA#....","#tT#aaaaabbaaAA#....","#tT#aaaaabbaaAA#....","#tTaaaaaabbaaAAA#...","#tTaaaaaabbaaAAA#...","#tTaaaaaabbaaAAA#...","#tTooooo####oooo#...",".##ooooo#..#oooo#..."],"mage":[".......#hhhh#H##....","......#hhhhhh##H#...","####.#hhhhhhhH##....","gggg#hhhhhhhhHH#....","gggghhhhhhhhhHHH##..","gggggbbbbbbbbbbbbH#.","gggghhhhhhhhhHHHHH#.","gggg##sssssShhh###..","#tT#.#s#sssShhh#....","#tT##ssesssShhh#....","#tT##ssssssShhh#....","#tT#.#aaaaaahhh#....","#tT#.#aaaaaahhh#....","#tT##aaaaaaaaA#.....","#tT##aaaaaaaaA#.....","#tsssaaaaaaaaA#.....","#tsssbbbbbbbbbb#....","#tT##bbbbbbbbbb#....","#tT#aaaaaaaaaAA#....","#tT#aaaaaaaaaAA#....","#tT#aaaaaaaaaAA#....","#tT#aaaaaaaaaAA#....","#tT#aaaaaaaaaAA#....","#tTaaaaaaaaaaAAA#...","#tTaaaaaaaaaaAAA#...","#tTaaaaaaaaaaAAA#...","#tTooooo####oooo#...",".##ooooo#..#oooo#..."],"rogue":["....................","....###########.....","...#hhhhhhhhHHH#....","...#hhhhhhhhHHH#....","...#hhhhhhhhHHH#....","...#hhssssshHHH#....","...#hhssssshHHH#....","....##s#ssshHHH#....","....#shhhhhhHHH#....","....#shhhhhhHHH#....","#....#hhhhhhHHHA#...","w#...#aaaaahHHHA#...","w####baaaaahHHHA#...","w#aaaabbaaaAAAAA#...","w#aaaaaabaaAAAAAA#..","wsssaaaaabaAAAAAA#..","#sss#aaaaabAAAAAA#..",".####aaaaaabbAAAA#..","....#bbbbbbbbbAAA#..","....#bbbbbbbbbAAA#..",".....#aaa#AAAAAAA#..",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAAAAAA#.",".....#aaa##AAA####..","....#oooo#oooo#.....","....#oooo#oooo#.....","....#oooo#oooo#....."],"ranger":["....................",".....##########.....","....#hhhhhhhhHH#....","..###hhhhhhhhHH#....",".#wW#hhhhhhhhHH#....",".#wW#hhsssshhHH##...","#w#W#hhsssshhHH#w#..","#w#W##s#ssshhHH##...","#w#W#ssessshhHHbb#..","w##W#sssssshhHHbb#..","w##W##ssssshhHHbb#..","w##W#abaaaahhHHbb#..","w##W#aabbaaaAAAbb#..","w##sssaaabaaAAAbb#..","w##sssaaaabaAAAbb#..","w##W#aaaaaabAAAbb#..","w##W#aaaaaaabbAbb#..","w##W#aaaaaaaAAbbb#..","w##W#bbbbbbbbbb##...","w##W#bbbbbbbbbb#....","#w#W##aaa##AAA#.....","#w#W##aaa##AAA#.....","#w#W##aaa##AAA#.....",".#wW##aaa##AAA#.....",".#wW##aaa##AAA#.....","..###oooo#oooo#.....","....#oooo#oooo#.....","....#oooo#oooo#....."],"monk":["....................","......#######.......",".....#sssssss#......",".....#ssssssSS#.....",".....#sssssSSS#.....",".....#s#sssSSS#.....","....#ssesssSSS#.....","....#ssssssSSS#.....",".....#sssssSSS#.....",".....#sssssSSS#.....",".....#aaaaaaAA#.....","..###absbsbabAA###..",".#sssaasssaaAAASSS#.",".#sssaasssaaAAASSS#.",".#sssaasssaaAAASSS#.","#ssssaasssaaAAASSSS#","#sss#aasssaaAAA#SSS#","#sss#bbbbbbbbbb####.",".####bbbbbbbbbbb#...","....#aaaaaaaAAbb#...",".....#aaa##AAAbb#...",".....#aaa##AAAbb#...",".....#aaa##AAAbb#...",".....#aaa##AAA##....",".....#aaa##AAA#.....","....#ssss#SSSS#.....","....#ssss#SSSS#.....","....#ssss#SSSS#....."],"bard":["......#######gggg#..","....##bbbbbbbg###...","...#bbbbbbbbbBBB#...","...#bbbbbbbbbBBB#...","....#hhhhhhhhhh#....","....#hhhhhhhhhh#....","....#hsssssShhh#....","#....#s#sssShhh#....","t#..#ssesssShhh#....","t#..#ssssssShhh#....","T#...#sssssShhh#....","#T#.#aaaaaaaAAA#....",".#T##aaaaaaaAAA#....","..#T#atttttaAAA#....","...#TttttttTsss#....","...#ttt###tTsss#....","...#ttt###tTsss#....","...#ttt###tTTAA#....","....#ttttttTbBB#....","....#btttttbbBB#....",".....#aaa##AAA#.....",".....#aaa##AAA#.....",".....#aaa##AAA#.....",".....#aaa##AAA#.....",".....#aaa##AAA#.....","....#oooo#oooo#.....","....#oooo#oooo#.....","....#oooo#oooo#....."],"hound":["...................#kk#K#...","...................#kkKKK#..","......#..#...#..#..#kkkKK#..","#....#c##c###c##c##ckkkkkk#.","k#..#c##ckkkckkckkckkkkkkkk#","#k#..#kkkkkkkkkkkkkkkkkekkk#","#kk##kkkkkkkkkkkkkkkkkkkkkk#",".#kkkkkkkkkkkkkkkkkkkkkkkk#.","..#kkkkkkkkkkkkkkkkkkkkkk#..","...#kkkkkkkkkkkkkkkkkkk##...","....#KKKKKKKKKKKKKKKKK#.....",".....#KKKKKKKKKKKKKKK#......",".....#KK#KKKKKKKKK#KK#......",".....#kk#KK#####kk#KK#......",".....#kk#KK#...#kk#KK#......",".....#kk#KK#...#kk#KK#......","....#KKK#KKK#.#KKK#KKK#.....","....#KKK#KKK#.#KKK#KKK#....."],"rat":["#.......#...........","K#....##g##.###.....","K#...#ggggg#kkk#....","K##.#ggGGGggkkk###..","#kk#kggGGGggkkkkkk#.",".#kkkggGGGggkkkkekk#","..#kkkgggggkkkkkkkk#","..#kkkkkkkkkkkkkkkk#","...#KKKKKKKKKKKKKK#.","....#KKKKKKKK#K###.."],"thorn":[".....#....#.....","....#G#..#G#....","..#.#g####g#.#..",".#G###ggggg##G#.","..#ggGgGGgggg#..","..#gGgGgGgGggg#.",".#gGGgGggGgGggg#",".#gGG#eggg#eggg#","#GgggeegggeegggG",".#ggGGggGgggggg#",".#gggGgGGGggggg#","..#ggg#####ggg#.","..#GgggggggggG#.","...###bgbgb###..","....#b##b##b#...","...#b#.#b#.#b#.."],"boar":["......##########............","....##MMMMMMMmmm###.........","..##MMMMMMMMMMMmmmm###......",".#mMMMMMMMMMMMMMmmmmKK#.....",".#mmMMMMMMMMMMMmmmmmKKK##...",".#mmmmMMMMMMMmmmmmmmmkkkk##.","..##mmmmmmmmmmmmmmmkkkkkkkk#","..#kkkkmmmmmmmmmkkkkkkkekkk#",".#kkkkkkkkkkkkkkkkkkkkkkkkkw",".#kkkkkkkkkkkkkkkkkkkkkkkkkw",".#kkkkkkkkkkkkkkkkkkkkkkkkwk","..#kkkkkkkkkkkkkkkkkkkkkkkwk","...#KKKKKKKKKKKKKKKKKKKKKwKK","....#KKKKKKKKKKKKKKKKKKKK###","....#KKKKKKKKKKKKKKKKKK##...","....#kkkKKK######kkkKKK#....","....#kkkKKK#....#kkkKKK#....",".....######......######....."],"wisp":["...#..#g#..#..","..#g#######g#.","...##ggggg##..","...#gGGGggg#..",".##gGGGGGggg#.","#ggGGGGGGGggg#",".#gGGGGGGGgggg",".#gGeeGGeeggg#",".#ggeeGGeeggg#",".#gggGGGggggg#","..#ggggggggg#.","...#ggggggg#..","...#ggggggg#..","..#g###g###g#."],"spider":["...#KK##k#.........#k##KK#..","..#K##..#k#.......#k#..##K#.","...#....#kk##....#kk#....#..","......##kkkkk##.##k##.......",".....#kKKKKkkkk#kkkkk#......","....#KKKKKKkKKkkkkkekk##....","...#kKKKkkkKkKkkkkkkkkKK##..",".##KKKKKKKkkkkkkkkkkkek#KK##","#KK#kkkKKKKKkkkkkkkkkkk###KK",".##.#kkkkkkkkkkkkkkkkk##..##",".....#kkkkkkkkk#kkkkk#KK#...","......##kkKkK##.####K###K##.","......##KKKK#......#KK#.#KK#",".....#KK#K##........##K#.##."],"mite":[".............#c#",".............#c#",".....#####..#c#c","...##kkkkk##c#c#","..#kkkccckkKcKc#",".#kkkcccccKKKcK#",".#kkkkccckKKeKK#",".#kkkkkkkkKKKKK#","..#kkkkkkkkKKK#.","..#K#kK#kK####.."],"leech":[".......###########......","....###ggggggggggg####..","..##gggggggGGGGGGGgggg#.",".#ggggggggGGGGGGGGggggg#","#ggggggggggGGGGGGgggeegg","#ggggggggggggggggggggggg","#gggggggggggggggggggggg#",".#GGGGGGGGGGGGGGGGGGGGG#","..#GGGGGGGGGGGGGGGGGGG#.","...####GGGGGGGGGGG####.."]};
+const HD_OF=new Map(Object.keys(SPR_HD).map(k=>[SPR[k],SPR_HD[k]]));
+const SHADE_C={};
+function shadeCol(c){if(SHADE_C[c])return SHADE_C[c];let r,g,b;
+  if(c[0]==='#'){const n=parseInt(c.slice(1),16);r=n>>16;g=n>>8&255;b=n&255}else{const m=c.match(/\d+/g)||[0,0,0];[r,g,b]=m.map(Number)}
+  return SHADE_C[c]=`rgb(${Math.round(r*.68)},${Math.round(g*.68)},${Math.round(b*.72)})`}
 const GREY={h:'#5a5468',s:'#8a8698',e:'#e0ae52',a:'#4a4458',b:'#3a3547',w:'#7a7690',o:'#2b2230',t:'#5a4632',g:'#e0ae52'};
 const FOE_LOOK={
  'Clockwork Rat':{s:'rat',p:{k:'#a8822a',e:'#e24b4a',g:'#e0ae52'}},
@@ -1274,7 +1282,7 @@ function palOf(m){
   return p;
 }
 const BFX=[];const bfx=e=>{if(BFX.length<300)BFX.push(e)};
-const BC=3,BW=128,BH=72;
+const BC=6,BW=128,BH=72;
 const BAT={q:[],cur:null,t:0,fx:[],fade:new Map(),flash:new Map(),foes:[],rects:[],frame:0,bg:{},wasBusy:false};
 const reduceMotion=()=>window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const touches=(e,o)=>e&&(e.a===o||e.f===o||e.t===o);
@@ -1363,9 +1371,11 @@ function slotsFor(n,side){
   return (side==='e'?E:P).slice(0,Math.max(1,n));
 }
 function drawSpr(g,rows,pal,ox,oy,flip,flash,alpha,scale){
-  const sc=scale||1;g.globalAlpha=alpha==null?1:Math.max(0,alpha);
-  for(let j=0;j<rows.length;j++){const r=rows[j];for(let i=0;i<r.length;i++){const ch=r[i];if(ch==='.'||!pal[ch])continue;
-    const ix=flip?r.length-1-i:i;g.fillStyle=flash?'#ffffff':pal[ch];g.fillRect(Math.round((ox+ix*sc)*BC),Math.round((oy+j*sc)*BC),BC*sc,BC*sc)}}
+  let sc=scale||1;g.globalAlpha=alpha==null?1:Math.max(0,alpha);
+  const hd=HD_OF.get(rows);if(hd){rows=hd;sc/=2}
+  for(let j=0;j<rows.length;j++){const r=rows[j];for(let i=0;i<r.length;i++){const ch=r[i];if(ch==='.')continue;
+    let c;if(ch==='#')c='#14121a';else if(pal[ch])c=pal[ch];else{const lo=ch.toLowerCase();if(lo===ch||!pal[lo])continue;c=shadeCol(pal[lo])}
+    const ix=flip?r.length-1-i:i;g.fillStyle=flash?'#ffffff':c;g.fillRect(Math.round((ox+ix*sc)*BC),Math.round((oy+j*sc)*BC),Math.ceil(BC*sc),Math.ceil(BC*sc))}}
   g.globalAlpha=1;
 }
 function lungeOf(o,dir){
@@ -1437,8 +1447,8 @@ function drawBattle(cv){
   g.textAlign='center';
   BAT.fx=BAT.fx.filter(x=>x.t<42);
   BAT.fx.forEach(x=>{x.t++;const p=pos.get(x.o);if(!p)return;const sx=p[0]*BC,sy=(p[1]-2-x.t*.25)*BC;
-    g.font=`700 ${x.big?26:19}px "Spline Sans Mono", ui-monospace, monospace`;
-    g.globalAlpha=x.t>30?(42-x.t)/12:1;g.fillStyle='#16141d';g.fillText(x.txt,sx+2,sy+2);g.fillStyle=x.col;g.fillText(x.txt,sx,sy);
+    g.font=`700 ${(x.big?26:19)*BC/3}px "Spline Sans Mono", ui-monospace, monospace`;
+    g.globalAlpha=x.t>30?(42-x.t)/12:1;g.fillStyle='#16141d';g.fillText(x.txt,sx+BC*2/3,sy+BC*2/3);g.fillStyle=x.col;g.fillText(x.txt,sx,sy);
     if(x.spark&&x.t<20)for(let k=0;k<4;k++)P(Math.round(p[0]-4+((k*5+x.t)%9)),Math.round(p[1]+10-((x.t+k*4)%14)),'#b5e08a');
     g.globalAlpha=1});
 }
@@ -1652,7 +1662,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.6.5';
+const GAME_VERSION='0.6.6';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2364,7 +2374,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.6.5",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.6.6",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

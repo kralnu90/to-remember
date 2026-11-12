@@ -20,6 +20,12 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.6 · 12 November 2026
+- **Sharper sprites:** every class and creature is redrawn with twice the detail, with shading and outlines to match the new backdrops
+- The hero carries a glowing hourglass clasp, the warrior and paladin have proper shields, casters have glowing staffs, the ranger has a bow and quiver, and the bard plays a lute
+- Creatures get the same treatment: glowing spines on the hounds, a gear on the Clockwork Rat's back, mossy manes on the boars, and more
+- Companions still wear their own colours, and strangers still look faded
+
 ### 0.6.5 · 12 November 2026
 - **New battle backdrops:** fights now take place in front of the room you're in, redrawn in the same lit pixel art as the hamlet and the dungeon
 - The present is a moonlit street with lamplight, glowing windows and the frozen clocktower (a bell tower in the chapels). The future is the same street lost to moss, roots and glowing fungi. Distant Echoes are tinted ghostly blue, with mist drifting across the ground
