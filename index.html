@@ -82,6 +82,17 @@ h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;l
 .door .cost{font-size:10px}
 .door.came{border-style:dashed;border-color:var(--line);cursor:default}
 .door.came b{color:var(--line);font-size:14px}
+.chamber{position:relative;max-width:420px;width:100%;margin:2px auto 0;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#141218}
+.chamber canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.rdoor{position:absolute;background:none;border:0;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:pointer;border-radius:6px}
+.rdoor.s{justify-content:flex-start}
+.rdoor.w{align-items:flex-start}.rdoor.e{align-items:flex-end}
+.rlbl{font:700 10px var(--body);background:#efe4c6;color:#2b2116;border:2px solid #5a4632;padding:1px 5px;box-shadow:2px 2px 0 rgba(0,0,0,.45);white-space:nowrap}
+.rlbl.echo{background:#16141d;color:var(--echo,#8fd3d0);border-color:var(--echo,#8fd3d0)}
+.rdoor:hover .rlbl,.rdoor:focus-visible .rlbl{background:#f6d78f;border-color:var(--brass)}
+.rdoor:hover .rlbl.echo,.rdoor:focus-visible .rlbl.echo{background:#24202e}
+.rdoor:focus-visible{outline:2px solid var(--brass);outline-offset:0}
+.chint{text-align:center}
 .n{grid-column:2;grid-row:1}.s{grid-column:2;grid-row:3}.w{grid-column:1;grid-row:2}.e{grid-column:3;grid-row:2}
 .note{border-left:3px solid var(--brass);padding:8px 12px;background:var(--slate);border-radius:0 8px 8px 0}
 
@@ -1052,6 +1063,154 @@ function speak(key,label,lines){
   return `<div class="wizard dlg"><span class="pt" aria-hidden="true"><img src="${portraitURL(key,0)}" alt=""><img class="talk" src="${portraitURL(key,1)}" alt=""></span><div class="dlg-body">${label?`<span class="eyebrow">${esc(label)}</span>`:''}${body}</div></div>`;
 }
 
+/* ======================= dungeon rooms: pixel-art chambers with doors ======================= */
+// Each room is drawn as a top-down chamber: walls, a floor for its era (cobbles in the present, cracked and overgrown
+// in the future, ghostly blue in a Distant Echo), a centrepiece for the place, and real doors on each wall.
+// makeRoomArt() paints and lights the static scene once per room; drawRoom() adds torch flicker, motes and glows.
+// The doors themselves stay HTML buttons laid over the canvas (RD_BOX), so they keep working with touch and keyboard.
+const RW=128,RH=104,RS=3;
+const ROOMART={key:null,c:null};
+const RD_BOX={n:[44,0,40,29],s:[44,85,40,19],w:[0,34,26,44],e:[102,34,26,44]};
+function artPainter(W,H){
+  const px=new Float32Array(W*H*3),em=new Uint8Array(W*H),L=[],cc={};
+  const col=h=>cc[h]||(cc[h]=[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+  const P=(x,y,h,g)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=W||y>=H)return;const c=col(h),i=(y*W+x)*3;px[i]=c[0];px[i+1]=c[1];px[i+2]=c[2];em[y*W+x]=g?1:0};
+  const R=(x0,y0,x1,y1,h,g)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)P(x,y,h,g)};
+  const E=(cx,cy,rx,ry,h,g)=>{for(let y=Math.floor(cy-ry);y<=cy+ry;y++)for(let x=Math.floor(cx-rx);x<=cx+rx;x++)if(((x-cx)/(rx+.5))**2+((y-cy)/(ry+.5))**2<=1)P(x,y,h,g)};
+  const POLY=(pts,h,g)=>{const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+    for(let y=Math.floor(Math.min(...ys));y<=Math.max(...ys);y++)for(let x=Math.floor(Math.min(...xs));x<=Math.max(...xs);x++){
+      let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const[xi,yi]=pts[i],[xj,yj]=pts[j];
+        if(((yi>y+.5)!==(yj>y+.5))&&(x+.5<(xj-xi)*(y+.5-yi)/(yj-yi)+xi))ins=!ins}
+      if(ins)P(x,y,h,g)}};
+  const SPRITE=(x,y,rows,pal,g)=>rows.forEach((r,j)=>{for(let i=0;i<r.length;i++)if(r[i]!=='.')P(x+i,y+j,pal[r[i]],g)});
+  const light=(x,y,r,c,s)=>L.push([x,y,r,c,s]);
+  const finish=(night,scale,tint)=>{
+    const out=new Uint8ClampedArray(W*H*4),BY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const k=y*W+x,i=k*3,d=BY[(y%4)*4+(x%4)]/16;let lr=0,lg=0,lb=0;
+      for(const[lx,ly,r,c,s]of L){const dd=Math.hypot(x-lx,(y-ly)*1.15)/r;if(dd>=1)continue;
+        const f=Math.floor(Math.pow(1-dd,1.6)*s*4+d)/4;lr+=f*c[0]/255;lg+=f*c[1]/255;lb+=f*c[2]/255}
+      let r=px[i],g=px[i+1],b=px[i+2];
+      if(!em[k]){r*=night[0]+lr*.9;g*=night[1]+lg*.9;b*=night[2]+lb*.9}
+      if(tint){const m=(r+g+b)/3;r=r*(1-tint[3])+m*tint[0]*tint[3];g=g*(1-tint[3])+m*tint[1]*tint[3];b=b*(1-tint[3])+m*tint[2]*tint[3]}
+      out[k*4]=r;out[k*4+1]=g;out[k*4+2]=b;out[k*4+3]=255}
+    const small=document.createElement('canvas');small.width=W;small.height=H;small.getContext('2d').putImageData(new ImageData(out,W,H),0,0);
+    const c=document.createElement('canvas');c.width=W*scale;c.height=H*scale;const g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(small,0,0,W*scale,H*scale);return c};
+  return {P,R,E,POLY,SPRITE,light,finish,L};
+}
+/* small door-sign icons, 7x7 */
+const RICON={
+ fight:['k.....k','.k...k.','..k.k..','...k...','..k.k..','.w...w.','w.....w'],
+ elite:['.wwwww.','wwwwwww','wkwwwkw','wwwwwww','.wwkww.','.w.w.w.','.......'],
+ treasure:['.......','.ggggg.','gbbbbbg','ggggggg','gbbkbbg','gbbbbbg','ggggggg'],
+ shrine:['...y...','..yoy..','...y...','..www..','..www..','..www..','.wwwww.'],
+ quiet:['..ccc..','.cc....','cc.....','cc.....','cc.....','.cc....','..ccc..'],
+ unknown:['.wwww..','ww..ww.','....ww.','...ww..','..ww...','.......','..ww...']
+};
+const RICON_PAL={k:'#c8ccd8',w:'#eef2f8',g:'#e8b840',b:'#8a5a2a',y:'#ffe680',o:'#ff9a3a',c:'#bfe8ff'};
+function roomKey(r){return [r.name,r.era,r.type==='echo'?'echo':'',DIRS.map(d=>{const x=r.doors[d];return x?(x.echo?'E':x.hint?x.type:'?'):r.entry===d?'c':'-'}).join('')].join('|')}
+function makeRoomArt(r){
+  const A=artPainter(RW,RH),{P,R,E,POLY,SPRITE,light}=A,fut=r.era==='future',echo=r.type==='echo';
+  const n=(x,y,s)=>tnz(x,y,s);
+  /* walls: north wall face, side wall tops, south wall top */
+  const wallTop=fut?'#3a4436':'#3a3446',wallFace=fut?'#5a6450':'#6a6274',wallLine=fut?'#46503e':'#544c60';
+  R(0,0,RW-1,RH-1,'#141218');
+  for(let y=0;y<22;y++)for(let x=0;x<RW;x++){const row=y>>2,off=(row%2)*4;let c=((x+off)%8===0||y%4===0)?wallLine:wallFace;
+    if(n(x>>3,row,5)>.8&&c===wallFace)c=fut?'#626e58':'#746c7e';if(fut&&n(x,y,6)>.86)c=n(x,y,7)>.5?'#3d7038':'#2c5a30';P(x,y,c)}
+  R(0,0,RW-1,3,wallTop);R(0,21,RW-1,21,'#1e1a24');
+  R(0,22,11,RH-1,wallTop);R(RW-12,22,RW-1,RH-1,wallTop);R(0,RH-10,RW-1,RH-1,wallTop);
+  for(let y=22;y<RH;y+=4){R(0,y,11,y,wallLine);R(RW-12,y,RW-1,y,wallLine)}
+  for(let x=0;x<RW;x+=6)R(x,RH-10,x,RH-1,wallLine);
+  R(11,22,11,RH-11,'#1e1a24');R(RW-12,22,RW-12,RH-11,'#1e1a24');R(12,RH-11,RW-13,RH-11,'#1e1a24');
+  /* floor */
+  for(let y=22;y<RH-10;y++)for(let x=12;x<RW-12;x++){
+    const bx=Math.floor((x-12+((y>>3)%2)*5)/10),by=Math.floor((y-22)/8),edge=(x-12+((y>>3)%2)*5)%10===0||(y-22)%8===0;
+    const v=n(bx,by,11);let c;
+    if(fut){c=edge?'#3e4a38':v>.66?'#6a7460':v>.33?'#626c58':'#5a6450';
+      if(n(x,y,12)>.9||(edge&&n(x,y,13)>.55))c=n(x,y,14)>.5?'#3d7038':'#4f8a44';
+      if(n(bx,by,15)>.85&&!edge)c='#2c3828'}
+    else{c=edge?'#4e4656':v>.66?'#8a8090':v>.33?'#7e7486':'#746a7c';if(!edge&&n(x,y,12)>.95)c='#968c9c'}
+    P(x,y,c)}
+  if(fut)for(let k=0;k<5;k++){let x=12+n(k,1,16)*104|0,y=22+n(k,2,16)*70|0;for(let s=0;s<14;s++){P(x,y,'#4a3220');x+=n(k,s,17)>.5?1:-1;y+=n(s,k,18)>.4?1:0}}
+  /* doors */
+  const plank=fut?['#5a4a34','#4a3c2a']:['#7a4a2a','#6a3e22'],iron='#3a3a44';
+  const doorN=st=>{const x0=54,y0=4;R(x0-2,y0-2,x0+21,21,'#2a2430');
+    for(let y=y0;y<=21;y++)for(let x=x0;x<=x0+19;x++){const ax=x-x0-9.5,ay=y-y0-8;if(ay<0&&ax*ax/90+ay*ay/64>1)continue;P(x,y,'#141018')}
+    if(st==='open'){for(let y=12;y<=21;y++)R(x0+2,y,x0+17,y,y>18?'#3a3446':'#201c28');light(64,24,16,[150,140,200],.4);return}
+    for(let y=y0;y<=21;y++)for(let x=x0+1;x<=x0+18;x++){const ax=x-x0-9.5,ay=y-y0-8;if(ay<0&&ax*ax/80+ay*ay/56>1)continue;P(x,y,plank[((x-x0)>>2)%2])}
+    R(x0+1,9,x0+18,9,iron);R(x0+1,17,x0+18,17,iron);P(x0+14,13,'#e8b840');P(x0+14,14,'#c09030')};
+  const doorS=st=>{R(52,RH-11,75,RH-1,'#1e1a24');for(let k=0;k<4;k++)R(54,RH-10+k*2,73,RH-9+k*2,k%2?'#3a3446':'#4a4458');
+    if(st==='open')R(54,RH-4,73,RH-1,'#141018')};
+  const doorSide=(x0,st,right)=>{R(x0,40,x0+11,73,'#141018');R(x0,40,x0+11,40,'#2a2430');R(x0,73,x0+11,73,'#2a2430');
+    if(st==='open')return;const fx=right?x0:x0+8;R(fx,42,fx+3,71,plank[0]);R(right?fx+3:fx,42,right?fx+3:fx,71,plank[1]);
+    R(fx,48,fx+3,48,iron);R(fx,64,fx+3,64,iron);P(right?fx:fx+3,57,'#e8b840')};
+  const sign=(d,dr)=>{const pos={n:[61,32],s:[61,75],w:[15,53],e:[106,53]}[d];const ico=dr.echo?null:dr.hint?RICON[dr.type]:RICON.unknown;
+    if(!ico)return;R(pos[0]-1,pos[1]-1,pos[0]+7,pos[1]+7,'#2a2024');SPRITE(pos[0],pos[1],ico,RICON_PAL,true)};
+  DIRS.forEach(d=>{const dr=r.doors[d],st=dr?(dr.echo?'echo':'shut'):r.entry===d?'open':null;if(!st)return;
+    if(d==='n')doorN(st==='open'?'open':'shut');if(d==='s')doorS(st==='open'?'open':'shut');
+    if(d==='w')doorSide(0,st==='open'?'open':'shut',false);if(d==='e')doorSide(RW-12,st==='open'?'open':'shut',true);
+    if(dr)sign(d,dr)});
+  /* torches flanking the north wall */
+  [[30,10],[97,10]].forEach(([x,y])=>{R(x,y,x+1,y+5,'#4a3220');R(x-1,y+5,x+2,y+5,'#2a2a30');light(x,y,30,fut?[200,230,140]:[255,160,70],1.1)});
+  /* the centrepiece for this place */
+  const cx=64,cy=58,nm=r.name;
+  const shadow=(x,y,rx,ry)=>E(x,y,rx,ry,fut?'#3a4434':'#4a4250');
+  if(/Fountain/.test(nm)){shadow(cx+2,cy+6,15,6);E(cx,cy+3,14,7,'#5d5a66');E(cx,cy+2,12,6,'#8d8a96');E(cx,cy+2,10,5,fut?'#2c3828':'#3f7396',!fut);
+    if(fut){for(let k=0;k<20;k++)P(cx-9+n(k,3,20)*18,cy-2+n(k,4,20)*8,n(k,5,20)>.5?'#3d7038':'#4f8a44');R(cx-1,cy-9,cx+1,cy+2,'#6d6a76');POLY([[cx+2,cy-9],[cx+6,cy-6],[cx+2,cy-6]],'#6d6a76')}
+    else{R(cx-1,cy-8,cx+1,cy+2,'#9d9aa6');E(cx,cy-8,4,1,'#8d8a96');for(const[dx,dy]of[[-4,-11],[-2,-13],[0,-14],[2,-13],[4,-11],[-6,-8],[6,-8]])P(cx+dx,cy+dy,'#bfe8ff',1);light(cx,cy-4,20,[120,220,255],.6)}}
+  else if(/Chapel|Belltower/.test(nm)){for(const row of[-14,-6,10,18])for(const s of[-1,1]){R(cx+s*8-(s<0?14:0),cy+row,cx+s*8+(s>0?14:0),cy+row+3,fut?'#4a3c2a':'#6a3e22');R(cx+s*8-(s<0?14:0),cy+row+3,cx+s*8+(s>0?14:0),cy+row+3,'#3a2414')}
+    const by=cy+2,big=/Belltower/.test(nm)?1.4:1;shadow(cx+2,by+8*big,9*big,3);
+    POLY([[cx-8*big,by+6*big],[cx+8*big,by+6*big],[cx+5*big,by-6*big],[cx-5*big,by-6*big]],fut?'#7a6a3a':'#c09030');POLY([[cx+2,by+6*big],[cx+8*big,by+6*big],[cx+5*big,by-6*big],[cx+2,by-6*big]],fut?'#5a4a2a':'#a07a20');
+    E(cx,by-6*big,5*big,2,fut?'#8a7a4a':'#e8b840');R(cx-9*big,by+6*big,cx+9*big,by+7*big,fut?'#5a4a2a':'#a07a20');
+    if(fut)for(let k=0;k<16;k++)P(cx-8+n(k,7,21)*16,by-6+n(k,8,21)*13,n(k,9,21)>.5?'#3d7038':'#2c5a30');else light(cx,by,18,[255,220,140],.4)}
+  else if(/Market|Square/.test(nm)){shadow(cx+3,cy+9,16,4);R(cx-14,cy-2,cx+14,cy+7,fut?'#4a3c2a':'#7a5a34');R(cx-14,cy+6,cx+14,cy+7,'#3a2414');
+    for(let i=0,x=cx-16;x<=cx+14;x+=4,i++)R(x,cy-10,x+3,cy-4,fut?(i%2?'#5a4a3a':'#3e4a38'):(i%2?'#c0392b':'#eef2f8'));R(cx-16,cy-4,cx+17,cy-4,fut?'#2c3828':'#8e2a20');
+    for(const[dx,c]of[[-10,'#c0392b'],[-6,'#e8b840'],[-2,'#7fd060'],[3,'#c0392b'],[8,'#e6a0c4']])R(cx+dx,cy,cx+dx+2,cy+2,fut?'#3d5030':c);
+    if(fut){R(cx+4,cy-20,cx+6,cy+4,'#4a3220');E(cx+5,cy-22,9,6,'#2c5a30');E(cx+3,cy-24,6,4,'#3d7038')}}
+  else if(/Mill/.test(nm)){R(12,cy-6,RW-13,cy+6,fut?'#2c4a40':'#2c5a80');R(12,cy-7,RW-13,cy-7,'#3a3446');R(12,cy+7,RW-13,cy+7,'#3a3446');
+    for(let k=0;k<8;k++)P(16+k*13,cy-3+(k%3)*3,'#5a9ac0');
+    if(!fut){E(cx,cy,12,12,'#6a3e22');E(cx,cy,10,10,'#2c5a80');for(let a=0;a<8;a++){const t=a*Math.PI/4;for(let s=2;s<12;s++)P(cx+Math.cos(t)*s,cy+Math.sin(t)*s,'#7a4a2a')}E(cx,cy,2,2,'#3a3a44')}
+    else{for(let k=0;k<4;k++)R(cx-14+k*8,cy-2+(k%2)*3,cx-10+k*8,cy-1+(k%2)*3,'#4a3c2a');for(let k=0;k<12;k++)P(20+n(k,1,22)*88,30+n(k,2,22)*50,'#2c4a40')}}
+  else if(/Forge|Blacksmith/.test(nm)){shadow(cx-10,cy+8,8,3);R(cx-20,cy-6,cx-4,cy+6,fut?'#4a4c48':'#5a5464');R(cx-18,cy-4,cx-6,cy+2,fut?'#2a2a24':'#ff8a3a',!fut);
+    if(!fut){R(cx-17,cy-3,cx-7,cy,'#ffd060',1);light(cx-12,cy-1,22,[255,140,60],.9)}
+    shadow(cx+12,cy+8,8,2);R(cx+6,cy-2,cx+18,cy+1,fut?'#6a5a4a':'#5a5a66');R(cx+4,cy-2,cx+6,cy-1,fut?'#6a5a4a':'#5a5a66');R(cx+10,cy+1,cx+14,cy+6,fut?'#5a4a3a':'#4a4a56');R(cx+8,cy+6,cx+16,cy+7,fut?'#5a4a3a':'#4a4a56');
+    if(fut)for(let k=0;k<14;k++)P(cx-20+n(k,3,23)*40,cy-6+n(k,4,23)*14,n(k,5,23)>.5?'#3d7038':'#4f8a44')}
+  else if(/Inn/.test(nm)){shadow(cx+2,cy+7,13,4);R(cx-12,cy-4,cx+12,cy+4,'#7a4a2a');R(cx-12,cy+3,cx+12,cy+4,'#5a3420');
+    for(const[dx,dy]of[[-8,-2],[4,-1],[-2,1]]){R(cx+dx,cy+dy-2,cx+dx+2,cy+dy,'#c8b48a');P(cx+dx,cy+dy-3,'#eef2f8')}
+    for(const[dx,dy]of[[-18,-1],[16,-1]])R(cx+dx,cy+dy,cx+dx+3,cy+dy+3,'#5a3420');
+    for(const[x,y]of[[18,30],[18,38],[24,30]]){E(x,y,3,3,'#7a4a2a');R(x-3,y,x+3,y,'#5a3420')}light(cx,cy-6,16,[255,180,90],.5);E(cx,cy-6,1,1,'#ffd27a',1)}
+  else if(/Lane/.test(nm)){R(cx-1,cy-16,cx,cy+6,'#2a2a30');R(cx-2,cy-20,cx+1,cy-17,fut?'#4a4c48':'#ffd27a',!fut);if(!fut)light(cx,cy-18,24,[255,190,100],.9);shadow(cx+2,cy+6,4,1);
+    for(const[x,y]of[[24,70],[30,74],[100,36]]){R(x,y,x+5,y+5,fut?'#4a3c2a':'#8a6a3a');R(x,y,x+5,y,'#5a3e24')}
+    if(fut)for(let k=0;k<10;k++){const x=20+n(k,1,24)*88|0,y=30+n(k,2,24)*50|0;R(x,y,x+3,y+1,'#5a6450');R(x,y+2,x+3,y+2,'#2a3426')}}
+  else if(/Grove/.test(nm)){shadow(cx+4,cy+10,22,7);R(cx-3,cy-10,cx+3,cy+8,'#4a3220');E(cx,cy-14,24,14,'#1f4426');E(cx-3,cy-16,18,10,'#2c5a30');E(cx-6,cy-19,10,6,'#3d7038');
+    for(let k=0;k<8;k++)P(cx-18+n(k,6,25)*36,cy-24+n(k,7,25)*18,'#c8ff96',1);light(cx,cy-12,26,[180,240,140],.6)}
+  else if(r.type==='start'){E(cx,cy,10,8,'#3a1a5a',1);E(cx,cy,7,6,'#6a2aa0',1);E(cx,cy,4,4,'#a04ae0',1);E(cx,cy,2,2,'#7fe8ff',1);light(cx,cy,30,[160,90,255],1)}
+  else{for(let k=0;k<6;k++){const x=30+n(k,1,26)*68|0,y=32+n(k,2,26)*48|0;E(x,y,2,1,fut?'#5a6450':'#6a6274')}}
+  /* light the scene */
+  const night=echo?[.42,.48,.75]:fut?[.42,.48,.48]:[.44,.42,.52];
+  return A.finish(night,RS,echo?[.75,.9,1.25,.55]:null);
+}
+function drawRoom(cv){
+  if(!S||!S.room)return;const r=S.room,key=roomKey(r);
+  if(ROOMART.key!==key){ROOMART.key=key;ROOMART.c=makeRoomArt(r)}
+  const g=cv.getContext('2d');g.imageSmoothingEnabled=false;const f=BAT.frame,still=reduceMotion(),fut=r.era==='future',echo=r.type==='echo';
+  g.drawImage(ROOMART.c,0,0);
+  const P=(i,j,col)=>{g.fillStyle=col;g.fillRect(Math.round(i)*RS,Math.round(j)*RS,RS,RS)};
+  /* torch flames */
+  [[30,10],[97,10]].forEach(([x,y],k)=>{const h=still?3:2+Math.round(bh(k*7,f>>2)*2),s=still?0:(bh(k,f>>3)>.5?1:0);
+    for(let j=0;j<h+1;j++)for(let i=0;i<2;i++)P(x+i+(j===h?s:0),y-1-j,j===0?(fut?'#e0ffb0':'#fff0a0'):j<h?(fut?'#9fd060':'#ffb030'):(fut?'#5f9030':'#e8602a'))});
+  /* echo doors shimmer in the companion's colour */
+  DIRS.forEach(d=>{const dr=r.doors[d];if(!dr||!dr.echo)return;const m=S.party.find(x=>x.id===dr.echo);const c=(m&&m.colour)||'#8fd3d0';
+    const b={n:[54,4,19,17],s:[54,RH-10,19,9],w:[0,40,11,33],e:[RW-12,40,11,33]}[d];
+    for(let k=0;k<14;k++){const t=still?k:(f*.05+k*1.7);P(b[0]+((k*7+(still?0:f>>3))%(b[2]+1)),b[1]+(Math.sin(t)*.5+.5)*b[3],k%3?c:'#ffffff')}});
+  /* dust motes stuck in time, or mist in an echo, or fireflies in the future */
+  const jit=still?0:((f%200)<6?((f>>1)%2?1:-1):0);
+  for(let k=0;k<12;k++){const x=16+bh(k,3)*96,y=26+bh(5,k)*62;
+    if(echo)P(x+(still?0:Math.sin(f*.01+k)*4),y,'#9ab8e8');
+    else if(fut)P(x+(still?0:Math.sin(f*.02+k)*5),y+(still?0:Math.cos(f*.025+k)*3),((f>>4)+k)%4?'#c8ff96':'#5a7a4a');
+    else P(x+(k%2?jit:0),y,'#b8b0c4')}
+}
+
 /* ======================= battle scene: pixel art drawn in code ======================= */
 // One sprite per class, written as text. Each letter is a colour slot; every character gets their own colours.
 const SPR={
@@ -1254,6 +1413,7 @@ function battleFrame(){
     if(S.phase==='summary'){if(busy)BAT.wasBusy=true;else if(BAT.wasBusy&&!UI.sheet){BAT.wasBusy=false;SFX.win();render()}}
   }
   const tc=document.getElementById('town');if(tc)drawTown(tc);
+  const rc=document.getElementById('room');if(rc)drawRoom(rc);
   const ma=document.getElementById('menuart');if(ma)drawMenuArt(ma);
 }
 document.addEventListener('click',e=>{
@@ -1445,7 +1605,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.6.3';
+const GAME_VERSION='0.6.4';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1819,14 +1979,14 @@ function renderRun(){
   if(S.phase==='summary'&&!UI.sheet&&!batBusy())UI.sheet='summary';
 }
 function roomView(){
-  const r=S.room;
+  const r=S.room,cost=Math.max(1,CFG.cMove-(TF().doorCut||0));
+  const box=d=>{const[x,y,w,h]=RD_BOX[d];return `left:${x/RW*100}%;top:${y/RH*100}%;width:${w/RW*100}%;height:${h/RH*100}%`};
   const doors=DIRS.map(d=>{
-    const dr=r.doors[d];
-    if(dr&&dr.echo){const m=S.party.find(x=>x.id===dr.echo);return `<div class="cell ${d}"><button class="door echo" style="--echo:${m.colour}" data-door="${d}" aria-label="Distant Echo, costs ${Math.max(1,CFG.cMove-(TF().doorCut||0))} seconds"><b>Distant<br>Echo</b><span class="cost">−${Math.max(1,CFG.cMove-(TF().doorCut||0))}s</span></button></div>`}
-    if(dr)return `<div class="cell ${d}"><button class="door" data-door="${d}" title="The path is worn, but the stones beneath it are unfamiliar." aria-label="${dr.hint?HINT[dr.type]:'Unknown'} door, costs ${Math.max(1,CFG.cMove-(TF().doorCut||0))} seconds"><b>${dr.hint?`<span style="font-size:11px">${HINT[dr.type]}</span>`:'?'}</b><span class="cost">−${Math.max(1,CFG.cMove-(TF().doorCut||0))}s</span></button></div>`;
-    if(r.entry===d)return `<div class="cell ${d}"><div class="door came" aria-label="The way you came"><b>came</b></div></div>`;
-    return '';
+    const dr=r.doors[d];if(!dr)return '';
+    if(dr.echo){const m=S.party.find(x=>x.id===dr.echo);return `<button class="rdoor ${d}" data-door="${d}" style="${box(d)};--echo:${m.colour}" aria-label="Distant Echo, costs ${cost} seconds"><span class="rlbl echo">Distant Echo · −${cost}s</span></button>`}
+    return `<button class="rdoor ${d}" data-door="${d}" style="${box(d)}" title="The path is worn, but the stones beneath it are unfamiliar." aria-label="${dr.hint?HINT[dr.type]:'Unknown'} door, costs ${cost} seconds"><span class="rlbl">${dr.hint?HINT[dr.type]:'?'} · −${cost}s</span></button>`;
   }).join('');
+  const nDoors=Object.keys(r.doors).length;
   const echoNote=Object.values(r.doors).find(x=>x.echo);
   return `<section class="room">
     <div class="roomhead"><h2>${esc(r.name)}</h2><span class="era ${r.era}">${r.era}</span></div>
@@ -1835,7 +1995,8 @@ function roomView(){
     ${r.name==='Market Square'&&S.phase==='room'&&TF().market&&!S.marketUsed?`<button class="btn primary" data-a="market">Pull time to heel <span class="cost">once per run</span></button>`:''}
     ${INSPECT[r.name]&&S.phase==='room'?`<button class="btn" data-a="inspect">${INSPECT[r.name].label} <span class="cost">free</span></button>`:''}
     ${echoNote?`<div class="note" style="border-color:${S.party.find(x=>x.id===echoNote.echo).colour}">${esc(S.party.find(x=>x.id===echoNote.echo).name)} keeps glancing at one of the doors.</div>`:''}
-    <div class="square">${doors}<div class="cell floor ${r.era}"><span class="eyebrow">Choose a door</span><span class="small">Every step costs time.<br>What lies behind is unknown.</span></div></div>
+    <div class="chamber"><canvas id="room" width="${RW*RS}" height="${RH*RS}" role="img" aria-label="${esc(r.name)}, with ${nDoors} door${nDoors===1?'':'s'} to choose from"></canvas>${doors}</div>
+    <p class="small chint">Choose a door. Every step costs time, and what lies behind is unknown.</p>
   </section>`;
 }
 function fightView(){
@@ -2160,7 +2321,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.6.3",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.6.4",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

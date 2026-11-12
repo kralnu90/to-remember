@@ -20,6 +20,12 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.6.4 · 12 November 2026
+- **Pixel-art dungeon rooms:** every room is now a torch-lit chamber with real doors in its walls, and a sign by each door showing what you know about it
+- Floors change with the era: worn cobbles in the present, cracked, mossy, root-split stone in the future, and a ghostly blue in Distant Echoes, where the door you're drawn to shimmers in your companion's colour
+- Each place has its own centrepiece: the frozen market stall, the fountain, the chapel bell, the mill wheel, the cold forge, the inn table and more, with overgrown versions in the future
+- The way you came stands open behind you
+
 ### 0.6.3 · 12 November 2026
 - **A new look for the hamlet:** the map is redrawn in much more detailed pixel art, at night, with lamplight, glowing windows and a swirling rift at the Edge of Time
 - The hamlet is stuck in time: chimney smoke, the fountain's spray, the campfire's sparks and a floating apple hang in the air, twitching now and then
