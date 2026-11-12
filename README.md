@@ -20,6 +20,10 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.7.1 · 12 November 2026
+- **New portraits:** every character who talks now has a detailed painted pixel-art portrait, from the hero and the wizard to each class, the Nemesis shadow and the two final bosses. They give a little bob as they speak
+- The portraits are saved for offline play too
+
 ### 0.7.0 · 12 November 2026
 - **The Nemesis system:** the creature that kills a companion now keeps their true name. When they come back as a stranger and finish their Distant Echoes, a red Nemesis door can appear while they're in your party
 - Behind it, the killer waits where your companion fell, and it talks. Beat it and every stranger in your party whose name it holds remembers who they are, and gets their talent

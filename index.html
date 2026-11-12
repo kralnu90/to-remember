@@ -235,8 +235,10 @@ body.big .wrap{zoom:1.12}
 .pt{position:relative;width:96px;height:96px;border-radius:8px;background:#3c486e;border:2px solid var(--line);overflow:hidden}
 .pt img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
 .pt .talk{opacity:0;animation:ptTalk .3s step-end 7}
+.pt.photo img{image-rendering:auto;transform-origin:50% 100%;animation:ptBob .32s step-end 6}
+@keyframes ptBob{0%{transform:translateY(-2%) scale(1.02)}50%{transform:none}}
 @keyframes ptTalk{0%{opacity:1}50%{opacity:0}}
-@media (prefers-reduced-motion: reduce){.pt .talk{animation:none}}
+@media (prefers-reduced-motion: reduce){.pt .talk,.pt.photo img{animation:none}}
 </style>
 
 </head>
@@ -1106,10 +1108,14 @@ function portraitURL(key,talk){
   P.r.forEach((r,y)=>{const row=unRle(talk&&P.t[y]?P.t[y]:r);for(let x=0;x<row.length;x++){const ch=row[x];if(ch!=='.'){g.fillStyle=P.p[ch];g.fillRect(x,y,1,1)}}});
   return PT_CACHE[id]=c.toDataURL();
 }
-// A dialogue box with a talking portrait. Lines starting with * are stage directions.
+// Painted portraits (since 0.7.1) live in portraits/<key>.webp. The packed pixel portraits above stay as a fallback.
+const PT_IMG=['hero','wizard','tavern','shopkeeper','warrior','paladin','cleric','rogue','ranger','mage','monk','bard','shadow','champion','rememberer'];
+// A dialogue box with a portrait that bobs as it talks. Lines starting with * are stage directions.
 function speak(key,label,lines){
   const body=lines.map(l=>l.startsWith('*')?`<span class="small"><i>${esc(l.replace(/\*/g,''))}</i></span>`:`<q>${esc(l)}</q>`).join('');
-  return `<div class="wizard dlg"><span class="pt" aria-hidden="true"><img src="${portraitURL(key,0)}" alt=""><img class="talk" src="${portraitURL(key,1)}" alt=""></span><div class="dlg-body">${label?`<span class="eyebrow">${esc(label)}</span>`:''}${body}</div></div>`;
+  const k=PT_IMG.includes(key)?key:'shadow';
+  const pic=`<span class="pt photo" aria-hidden="true"><img src="portraits/${k}.webp" alt="" onerror="this.onerror=null;this.src=portraitURL('${k}',0)"></span>`;
+  return `<div class="wizard dlg">${pic}<div class="dlg-body">${label?`<span class="eyebrow">${esc(label)}</span>`:''}${body}</div></div>`;
 }
 
 /* ======================= dungeon rooms: pixel-art chambers with doors ======================= */
@@ -1712,7 +1718,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.0';
+const GAME_VERSION='0.7.1';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2433,7 +2439,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.1",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

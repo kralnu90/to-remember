@@ -1,8 +1,8 @@
 // 30× to Remember offline support.
 // The game page is fetched fresh whenever there's signal, so updates show up on their own;
 // the saved copy is only used offline. Bump VERSION if icons or the manifest change.
-const VERSION='tr-v1';
-const CORE=['./','index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png','icons/favicon.png'];
+const VERSION='tr-v2';
+const CORE=['./','index.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png','icons/favicon.png'].concat(['hero','wizard','tavern','shopkeeper','warrior','paladin','cleric','rogue','ranger','mage','monk','bard','shadow','champion','rememberer'].map(k=>'portraits/'+k+'.webp'));
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('tr-')&&k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
