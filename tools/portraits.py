@@ -285,6 +285,28 @@ def bard(talk):
     k.rect(3, 6, 36, 38, 'p')
     return k.outline()
 
+def shopkeeper(talk):
+    k = C(); shoulders(k, 'A', 'a'); neck(k)
+    k.rect(39, 47, 19, 28, 'W'); k.rect(39, 47, 26, 28, 'w')     # shirt front
+    k.rect(39, 41, 21, 26, 'P'); k.rect(40, 40, 23, 24, 'p')       # bow tie
+    for r in (43, 46): k.px(r, 18, 'G'); k.px(r, 29, 'G')          # waistcoat buttons
+    standard_face(k, talk, iris='E', brow='h')
+    # round spectacles
+    for c0 in (16, 26):
+        k.rect(22, 22, c0 + 1, c0 + 4, 'G'); k.rect(26, 26, c0 + 1, c0 + 4, 'G')
+        k.rect(23, 25, c0, c0, 'G'); k.rect(23, 25, c0 + 5, c0 + 5, 'G')
+    k.rect(23, 23, 22, 25, 'G')
+    k.rect(23, 23, 14, 15, 'g'); k.rect(23, 23, 32, 33, 'g')       # arms to ears
+    # neat side-parted hair
+    k.ell(17, 23.5, 6, 11, 'H', 10, 21)
+    k.rect(15, 20, 13, 15, 'H'); k.rect(15, 21, 32, 34, 'H')
+    k.rect(18, 19, 16, 20, 'H'); k.rect(18, 18, 21, 31, 'H')
+    k.recolour(10, 21, 29, 35, 'H', 'h')
+    k.rect(20, 21, 13, 14, 'w'); k.rect(20, 21, 33, 34, 'w')       # greying temples
+    # pencil tucked behind ear
+    k.rect(17, 24, 35, 36, 'C'); k.rect(17, 17, 35, 36, 'R'); k.rect(24, 24, 35, 36, 'S')
+    return k.outline()
+
 def shadow(talk):
     k = C()
     k.ell(48, 23.5, 10, 23, 'A', 37)
@@ -348,6 +370,7 @@ CAST = [
     ('hero', 'The Fixed Point', hero, P(H='#5a3a24', h='#3e2818', A='#2f7f86', a='#1f5a60', P='#7fe8ff', g='#2f7f86')),
     ('wizard', 'The Wizard', wizard, P(A='#5b3aa0', a='#3e2672', C='#e8b840', P='#ffe680', E='#5a8ad0')),
     ('tavern', 'Tavern Keeper', tavern, P(A='#7a4a2a', a='#55331d', C='#3a2a1a', P='#c0392b', p='#8e2a20', H='#8a5a34', h='#5e3a20', S='#dca07a', s='#b87a5c')),
+    ('shopkeeper', 'Shopkeeper', shopkeeper, P(A='#3f6b4a', a='#2a4a32', P='#8a2a3a', p='#5a1a26', H='#4a3a2a', h='#30251a', C='#e8c040', R='#e0866e', S='#e2aa84', s='#bc8466')),
     ('warrior', 'Warrior', warrior, P(A='#c83a2b', a='#8e2a20')),
     ('paladin', 'Paladin', paladin, P(P='#ffe680', E='#3c6eaa', S='#c98e68', s='#a06a4c')),
     ('cleric', 'Cleric', cleric, P(H='#d8c27a', h='#a8924e', P='#f4f0ff', p='#9fd88a', E='#6a9a4a')),
