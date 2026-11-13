@@ -20,6 +20,21 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.8.0 · 13 November 2026
+- **Milestone bosses.** From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes: the Forgotten King, the Clockwork Sovereign, the Maw Beneath and the Paradox Regent. Each must be beaten before the next appears, and until it falls, creatures from deeper loops stay away.
+- Each boss fights its own way: the King's Royal Decree and risen guards, the Sovereign's rewind (Slow stops it) and Overclock, the Maw's grasping tentacles and hunger, and the Regent's shifting forms, Timeline Collapse and second self.
+- Time holds its breath at a boss door: the living are healed to full before the fight. One try per run, no smoke bombs.
+- **Legendary gear**: the King's Signet, the Sovereign Gear, the Abyssal Heart and the Paradox Crown, each with its own effect. They bind to your hero for good.
+
+### 0.7.9 · 13 November 2026
+- Kris's painted battle scenes: the same street in the past, the present and the future, with glowing lamps, flickers and fireflies.
+
+### 0.7.5 – 0.7.8 · 13 November 2026
+- Kris's painted map of Bleakthorpe with animated effects, round buttons on the map edges, a Party panel, and a first-visit tour of the village.
+
+### 0.7.3 – 0.7.4 · 13 November 2026
+- Difficulty and class balance pass. New rare suffix "of Renewal" heals a little each turn.
+
 ### 0.7.2 · 12 November 2026
 - **The hero, redrawn:** the Fixed Point now fights with painted sprites from Kris's new sheet: a ready stance, a sword swing (it bursts into flame on a crit), glowing hands when casting, and a proper fall when downed
 - **The wizard has come outside:** he waits by his tower door on the hamlet map, shifting on his feet, and now and then waves or throws up a few sparks. The hero stands by the fountain
