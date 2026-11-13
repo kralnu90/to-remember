@@ -114,6 +114,10 @@ h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;l
 @keyframes tgo{50%{box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 22px rgba(190,110,255,.85),inset 0 0 12px rgba(220,160,255,.5)}}
 @media (prefers-reduced-motion:reduce){.tround.go{animation:none}}
 .tround .tbadge{top:-4px;right:-4px;border-radius:9px}
+.pmem{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
+.pmem img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#3c486e;border:2px solid var(--line)}
+.pmem .pn{font-weight:700}.pmem .ps{font:12px var(--mono);color:var(--muted,#a9a3b8);margin-top:2px}
+.pmem .xpbar{height:4px;border-radius:2px;background:rgba(255,255,255,.08);margin-top:6px;overflow:hidden}.pmem .xpbar i{display:block;height:100%;background:var(--brass)}
 .tplace:focus-visible{outline:2px solid var(--brass);outline-offset:0}
 .tbadge{position:absolute;top:0;right:4%;min-width:18px;height:18px;padding:0 4px;background:var(--brass);color:#1d1606;border:2px solid #2b2116;font:700 11px var(--mono);display:flex;align-items:center;justify-content:center}
 .menu{display:grid;gap:12px;padding-top:8px}
@@ -1691,15 +1695,17 @@ const T_ICON={
  menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
  tree:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
  gate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 21V8a7 7 0 0 1 14 0v13"/><path d="M12 9.5a2.5 2.5 0 1 1-2.5 2.5c0-2.8 2.2-5 5-5a5 5 0 0 1 5 5"/></svg>',
+ party:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.2c2.9 0 5 2.2 5 5.3"/></svg>',
  tune:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'};
 function townRound(){
   const pts=pointsFree(),B=[
    {a:'menu',x:44,y:200,cap:'Menu',aria:'Main menu'},
    {a:'tree',x:608,y:640,cap:'Skills',aria:'Skill tree'+(pts>0?`, ${pts} point${pts>1?'s':''} to spend`:''),badge:pts>0?String(pts):''},
+   {a:'partyinfo',x:44,y:770,cap:'Party',aria:`Your party: ${1+M.party.length} of 4`,badge:`${1+M.party.length}/4`},
    {place:'gate',x:604,y:978,cap:'Dungeon',aria:'Enter the dungeon',cls:'go'}];
   if(SET.tools)B.push({a:'tune',x:44,y:330,cap:'Tuning',aria:'Tuning and test tools'});
   return B.map(b=>`<button class="tround ${b.cls||''}" ${b.place?`data-place="${b.place}"`:`data-a="${b.a}"`} aria-label="${esc(b.aria)}"
-    style="left:${b.x/TWc*100}%;top:${b.y/THc*100}%">${T_ICON[b.place||b.a]}<span class="tcap">${b.cap}</span>${b.badge?`<span class="tbadge">${b.badge}</span>`:''}</button>`).join('');
+    style="left:${b.x/TWc*100}%;top:${b.y/THc*100}%">${T_ICON[b.place||(b.a==='partyinfo'?'party':b.a)]}<span class="tcap">${b.cap}</span>${b.badge?`<span class="tbadge">${b.badge}</span>`:''}</button>`).join('');
 }
 function townMapHTML(){
   const tavBadge=M.tavern.some(r=>r.stranger)?'?':(M.freeHires>0?'!':'');
@@ -1933,17 +1939,28 @@ function townMap(){
 function renderTown(){
   ensureEconomy();
   if(!UI.wiz||UI.wizLoop!==M.loop){UI.wiz=wizardLine();UI.wizLoop=M.loop}
-  const pm=['hero'].concat(M.party).map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean);
   app.innerHTML=`<section style="display:grid;gap:12px;padding-top:8px">
     <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">The Hamlet</h1></div>
       <div style="text-align:right;display:flex;gap:16px"><div><div class="eyebrow">Gold</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.gold||0}</div></div><div><div class="eyebrow">Crystals</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.crystals}</div></div></div></div>
     ${townMapHTML()}
     <p class="small" style="text-align:center;margin:0">Tap a glowing marker to visit. Press and hold the map to see the names.</p>
-    <div class="chips">${pm.map(c=>`<span class="chip"><b style="color:${c.key==='hero'||c.stranger?'inherit':c.colour}">${esc(c.name)}</b> ${CLASSES[c.key].cls} ${c.lvl}</span>`).join('')}</div>
 ${foot()}</section>`;
   if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
 }
 const SHOP_LINES=['Back again? Funny, I could swear I sold you that yesterday.','Everything must go. It always does, round here.','Gold only. Crystals give me a headache.','Stock comes back every morning. Don\'t ask me how.'];
+function partyInfoSheet(){
+  const pm=['hero'].concat(M.party).map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean);
+  return `<div class="eyebrow">The Hamlet · Loop ${M.loop}</div><h2>Your party</h2>
+    <div style="display:grid;gap:8px">${pm.map(c=>{const st=calc(c,c.gear||{}),k=c.key==='hero'?'hero':c.stranger?'shadow':(PT_IMG.includes(c.key)?c.key:'shadow'),need=nextXp(c.lvl),pct=Math.max(0,Math.min(100,Math.round((c.xp||0)/need*100)));
+      return `<div class="pmem"><img src="portraits/${k}.webp" alt="" onerror="this.onerror=null;this.src=portraitURL('${k}',0)">
+        <div><div class="pn" style="color:${c.key==='hero'||c.stranger?'inherit':c.colour}">${esc(c.name)}${c.stranger?' <span class="small">(stranger)</span>':''}${c.cursed?' <span class="small">(Unworthy)</span>':''}</div>
+        <div class="small">${CLASSES[c.key].cls} · Level ${c.lvl}</div>
+        <div class="ps">${st.maxHp} life · ${st.dmgMin}–${st.dmgMax} dmg · ${st.arm} armour</div>
+        <div class="xpbar" title="XP ${c.xp||0} of ${need}"><i style="width:${pct}%"></i></div></div></div>`}).join('')}
+      ${pm.length<4?`<p class="small" style="margin:0">${4-pm.length} space${4-pm.length>1?'s':''} free. Smaller parties earn more loot and XP.</p>`:''}</div>
+    <div class="row"><button class="btn" data-place="party">Change party</button><button class="btn" data-a="gear">Gear</button></div>
+    <button class="btn primary" data-a="close">Close</button>`;
+}
 function storeSheet(){
   ensureEconomy();if(!UI.shopLine||UI.shopLoop!==M.loop){UI.shopLine=pick(SHOP_LINES);UI.shopLoop=M.loop}
   const packed=STORE.filter(([k])=>M.pack[k]).map(([k,n])=>`${n} ×${M.pack[k]}`).concat((M.pack.gear||[]).map(it=>esc(it.name))).join(', ');
@@ -2184,6 +2201,7 @@ function renderSheet(){
   else if(kind==='newconfirm')h=`<h2>Start a new game?</h2><p class="desc">This deletes your hero, companions, crystals and loops on this device, and starts again from loop 1.</p>
     <div class="row"><button class="btn" data-a="close">Keep my save</button><button class="btn primary" data-a="newyes">Start again</button></div>`;
   else if(kind==='hire')h=hireSheet();
+  else if(kind==='partyinfo')h=partyInfoSheet();
   else if(kind==='events')h=eventsSheet();
   else if(kind==='abandon')h=`<h2>Abandon this run?</h2><p class="desc">It counts as running out of time: anyone who's down is lost, and only equipped soulbound gear is kept.</p>
     <div class="row"><button class="btn" data-a="close">Keep playing</button><button class="btn primary" data-a="abandonyes">Abandon</button></div>`;
@@ -2332,6 +2350,7 @@ document.addEventListener('click',e=>{
     case 'givegold':ensureEconomy();M.gold+=100;save();render();break;
     case 'sanctum':UI.sheet='sanctum';render();break;
     case 'tree':UI.sheet='tree';render();break;
+    case 'partyinfo':UI.sheet='partyinfo';render();break;
     case 'respec':treeRespec();UI.treeSel=null;save();render();break;
     case 'market':if(!S.marketUsed&&TF().market){S.marketUsed=true;S.market={potion:2,phoenix:1,stopwatch:1,smoke:1};S.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.25))});UI.sheet='market';S.roomMsg='Time runs properly here, for a moment. The party feels rested.';save()}render();break;
     case 'wizback':UI.sheet='wizard';UI.wizN=null;render();break;
