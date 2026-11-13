@@ -1592,14 +1592,14 @@ function battleOnlyView(){return `<section class="room"><div class="turnline"><h
 
 const tnz=(x,y,s)=>{let n=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263)+Math.imul(s|0,1442695041))>>>0;n=Math.imul(n^(n>>>13),1274126177)>>>0;return(n&0xffff)/65535};
 /* ======================= the hamlet map: Kris's painted town + particles drawn in code ======================= */
-// Since 0.7.5 the hamlet is Kris's pixel painting (sprites/town.webp, 652x1072, cropped from tools/town_source.jpg:
-// frame removed and the empty road south trimmed). drawTown() paints it 1:1 and lays code-drawn effects on top:
+// Since 0.7.5 the hamlet is Kris's pixel painting (sprites/town2.webp since 0.7.8: 652x1514, the full picture from
+// tools/town_source.jpg with just the frame removed). drawTown() paints it 1:1 and lays code-drawn effects on top:
 // twinkling stars, the swirling rift, tower and memorial glows, campfire flicker and embers, fountain spray, chimney
 // smoke, lamp glow, river glints and fireflies. Every so often time "hiccups": every particle hangs still for a beat
 // and a faint ripple runs out from the rift, because the hamlet is stuck in a loop.
-const TWc=652,THc=1072;
+const TWc=652,THc=1514;
 const TOWN={img:null,ok:false,parts:[],last:0,t:0};
-function townImg(){if(!TOWN.img){const i=new Image();i.onload=()=>{TOWN.ok=true};i.src='sprites/town.webp';TOWN.img=i}return TOWN.ok?TOWN.img:null}
+function townImg(){if(!TOWN.img){const i=new Image();i.onload=()=>{TOWN.ok=true};i.src='sprites/town2.webp';TOWN.img=i}return TOWN.ok?TOWN.img:null}
 const T_PLACES=[
  {k:'gate',label:'The Edge of Time',box:[262,160,126,128],mk:[325,168],aria:'The Edge of Time: enter the dungeon'},
  {k:'memorial',mk:[151,326],label:'Memorial Stone',box:[104,330,96,112],aria:'The Memorial Stone'},
@@ -1616,7 +1616,8 @@ const TP={rift:[325,229],crystal:[548,282],spire:[548,150],clock:[548,355],memo:
 const T_STARS=Array.from({length:46},(_,k)=>[Math.round(tnz(k,1,77)*648)+2,Math.round(Math.pow(tnz(k,2,77),1.4)*118)+4,tnz(k,3,77)*6.28,.6+tnz(k,4,77)*1.6,tnz(k,5,77)>.82]);
 // where fireflies hang about: tree clumps and the meadow
 const T_FLY=[[60,230],[80,420],[170,190],[210,270],[440,170],[460,330],[620,210],[630,420],[600,640],[40,790],[220,860],[440,1000],
-  [540,960],[620,1010],[180,1050],[60,1060],[250,420],[400,420],[600,560],[470,700]];
+  [540,960],[620,1010],[180,1050],[60,1060],[250,420],[400,420],[600,560],[470,700],
+  [60,1160],[200,1180],[460,1150],[600,1200],[120,1300],[260,1330],[420,1320],[580,1350],[80,1440],[230,1460],[450,1450],[610,1470]];
 function townSpawn(type,x,y,o){if(TOWN.parts.length<260)TOWN.parts.push(Object.assign({type,x,y,vx:0,vy:0,age:0,life:1,sz:3},o))}
 const tLerp=(a,b,t)=>a+(b-a)*t;
 function glow(g,x,y,r,rgb,a){if(a<=0)return;const gr=g.createRadialGradient(x,y,0,x,y,r);
@@ -1664,7 +1665,7 @@ function drawTown(cv){
     if(ch(14))townSpawn('drop',TP.spout[0]+(Math.random()-.5)*4,TP.spout[1],{vx:(Math.random()<.5?-1:1)*(10+Math.random()*16),vy:-26-Math.random()*16,life:1.2});
     [[TP.tavSmoke,2.2],[TP.cotSmoke,1.8]].forEach(([[x,y],r])=>{if(ch(r))townSpawn('smoke',x+(Math.random()-.5)*6,y,{vx:5+Math.random()*5,vy:-12-Math.random()*6,life:3.5+Math.random()*1.5,sz:4+Math.random()*3})});
     if(ch(4)){const y=150+Math.random()*560;townSpawn('glint',3+Math.random()*9,y,{life:.6+Math.random()*.5})}
-    if(TOWN.parts.filter(p=>p.type==='fly').length<26&&ch(6)){const[fx,fy]=T_FLY[Math.floor(Math.random()*T_FLY.length)];
+    if(TOWN.parts.filter(p=>p.type==='fly').length<34&&ch(8)){const[fx,fy]=T_FLY[Math.floor(Math.random()*T_FLY.length)];
       townSpawn('fly',fx+(Math.random()-.5)*60,fy+(Math.random()-.5)*50,{life:6+Math.random()*6,ph:Math.random()*6,c:Math.random()<.8?'#d8ff8a':'#e8b8ff'})}
   }
   /* --- move and draw particles --- */
@@ -1759,7 +1760,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.7';
+const GAME_VERSION='0.7.8';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1782,7 +1783,7 @@ function sendReview(r){return fetch(`https://docs.google.com/forms/d/e/${FORM_ID
 function menuBtn(a,title,sub,extra){return `<button class="btn mb" ${a?`data-a="${a}"`:''} ${extra||''}><b>${title}</b>${sub?`<span>${sub}</span>`:''}</button>`}
 function renderMenu(){
   const has=!!M;
-  const cont=has?(S?`Back into the loop · ${fmt(S.survival)} survived`:`The Hamlet · Loop ${M.loop}`):'';
+  const cont=has?(S?`Back into the loop · ${fmt(S.survival)} survived`:`Bleakthorpe · Loop ${M.loop}`):'';
   const newForm=!has?`<div class="field"><span class="eyebrow">Your hero</span>
       <div class="seg"><button class="btn ${UI.gender==='m'?'on':''}" data-g="m">Lorrance</button><button class="btn ${UI.gender==='f'?'on':''}" data-g="f">Lorraine</button></div>
       <label class="field"><span class="small">Name (change it if you like)</span><input id="heroname" value="${esc(UI.heroName)}" maxlength="18" autocomplete="off"></label></div>
@@ -1824,7 +1825,7 @@ function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is 
   <div class="small"><b>Fights are turn-based.</b> Pick an action, then tap a target on the battle scene or its card. Attacks always land unless the target dodges. Armour cuts the damage you take, crits hit for extra, and skills deal a share of your weapon damage, so better gear makes every skill stronger.</div>
   <div class="small"><b>Smaller parties earn more.</b> Fewer companions means bigger time drops and more XP each.</div>
   <div class="small"><b>Fallen companions.</b> Anyone still down when the loop resets is lost. Some come back later as strangers who don't remember you. Follow their Distant Echoes to help them remember. The last piece, their true name, is held by the creature that killed them: once their echoes are done, a red Nemesis door appears while they're in your party. Win and they return stronger. Lose three times and it gives the name back cursed.</div>
-  <div class="small"><b>The Hamlet</b> is safe. Hire companions at the Tavern, choose your party at the Campfire, check gear at your Cottage, and talk to the Wizard. He knows more than he's letting on.</div>
+  <div class="small"><b>Bleakthorpe</b> is safe. Hire companions at the Tavern, choose your party at the Campfire, check gear at your Cottage, and talk to the Wizard. He knows more than he's letting on.</div>
   </div><button class="btn primary" data-a="close">Got it</button>`}
 function setSeg(k,opts){return `<div class="seg">${opts.map(([v,l])=>`<button class="btn ${String(SET[k])===String(v)?'on':''}" data-set="${k}:${v}" aria-pressed="${String(SET[k])===String(v)}">${l}</button>`).join('')}</div>`}
 function settingsSheet(){return `<div class="eyebrow">Settings</div><h2>Make it yours</h2>
@@ -1984,7 +1985,7 @@ function renderTown(){
   if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
   if(UI.tour==null&&!UI.sheet&&!flags().tourDone)UI.tour=0;
   app.innerHTML=`<section style="display:grid;gap:12px;padding-top:8px">
-    <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">The Hamlet</h1></div>
+    <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">Bleakthorpe</h1></div>
       <div style="text-align:right;display:flex;gap:16px"><div><div class="eyebrow">Gold</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.gold||0}</div></div><div><div class="eyebrow">Crystals</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.crystals}</div></div></div></div>
     ${townMapHTML()}
 </section>`;
@@ -1992,7 +1993,7 @@ function renderTown(){
 const SHOP_LINES=['Back again? Funny, I could swear I sold you that yesterday.','Everything must go. It always does, round here.','Gold only. Crystals give me a headache.','Stock comes back every morning. Don\'t ask me how.'];
 function partyInfoSheet(){
   const pm=['hero'].concat(M.party).map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean);
-  return `<div class="eyebrow">The Hamlet · Loop ${M.loop}</div><h2>Your party</h2>
+  return `<div class="eyebrow">Bleakthorpe · Loop ${M.loop}</div><h2>Your party</h2>
     <div style="display:grid;gap:8px">${pm.map(c=>{const st=calc(c,c.gear||{}),k=c.key==='hero'?'hero':c.stranger?'shadow':(PT_IMG.includes(c.key)?c.key:'shadow'),need=nextXp(c.lvl),pct=Math.max(0,Math.min(100,Math.round((c.xp||0)/need*100)));
       return `<div class="pmem"><img src="portraits/${k}.webp" alt="" onerror="this.onerror=null;this.src=portraitURL('${k}',0)">
         <div><div class="pn" style="color:${c.key==='hero'||c.stranger?'inherit':c.colour}">${esc(c.name)}${c.stranger?' <span class="small">(stranger)</span>':''}${c.cursed?' <span class="small">(Unworthy)</span>':''}</div>
@@ -2503,7 +2504,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.7",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.8",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
