@@ -98,11 +98,22 @@ h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;l
 
 /* fight */
 .battle{display:block;width:100%;max-width:100%;aspect-ratio:16/9;height:auto;image-rendering:pixelated;border-radius:10px;border:1px solid var(--line);background:#16141d;cursor:pointer}
-.tmap{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#3f6a35}
+.tmap{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#3f6a35;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .tmap canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
 .tplace{position:absolute;background:none;border:0;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:pointer;line-height:1.2;border-radius:6px}
-.tplace .tlbl{font:700 11px var(--body);background:#efe4c6;color:#2b2116;border:2px solid #5a4632;padding:1px 6px;box-shadow:2px 2px 0 rgba(0,0,0,.45);white-space:nowrap}
-.tplace:hover .tlbl,.tplace:focus-visible .tlbl{background:#f6d78f;border-color:var(--brass)}
+.tplace .tlbl{font:700 11px var(--body);background:rgba(20,16,30,.82);color:#f0dfb0;border:1px solid rgba(224,174,82,.6);border-radius:10px;padding:2px 8px;white-space:nowrap;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;pointer-events:none}
+.tplace:hover .tlbl,.tplace:focus-visible .tlbl,.tmap.names .tlbl{opacity:1;transform:none}
+.tround{position:absolute;width:clamp(42px,12.5%,56px);aspect-ratio:1;border-radius:50%;padding:0;margin:0;display:grid;place-items:center;cursor:pointer;
+  background:radial-gradient(circle at 50% 35%,rgba(58,46,78,.92),rgba(18,14,28,.92));border:2px solid var(--brass);color:#f3dca0;
+  box-shadow:0 0 0 2px rgba(0,0,0,.45),0 3px 8px rgba(0,0,0,.5),inset 0 0 8px rgba(224,174,82,.25);transform:translate(-50%,-50%)}
+.tround svg{width:56%;height:56%;display:block}
+.tround .tcap{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;font:700 9px var(--body);letter-spacing:.06em;text-transform:uppercase;color:#f0dfb0;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 4px #000}
+.tround:active{transform:translate(-50%,-50%) scale(.93)}
+.tround:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.tround.go{border-color:#c98cff;color:#f2dcff;background:radial-gradient(circle at 50% 35%,rgba(110,50,170,.95),rgba(30,12,50,.95));box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 14px rgba(190,110,255,.6),inset 0 0 10px rgba(220,160,255,.35);animation:tgo 2.4s ease-in-out infinite}
+@keyframes tgo{50%{box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 22px rgba(190,110,255,.85),inset 0 0 12px rgba(220,160,255,.5)}}
+@media (prefers-reduced-motion:reduce){.tround.go{animation:none}}
+.tround .tbadge{top:-4px;right:-4px;border-radius:9px}
 .tplace:focus-visible{outline:2px solid var(--brass);outline-offset:0}
 .tbadge{position:absolute;top:0;right:4%;min-width:18px;height:18px;padding:0 4px;background:var(--brass);color:#1d1606;border:2px solid #2b2116;font:700 11px var(--mono);display:flex;align-items:center;justify-content:center}
 .menu{display:grid;gap:12px;padding-top:8px}
@@ -1578,13 +1589,13 @@ const TWc=652,THc=1072;
 const TOWN={img:null,ok:false,parts:[],last:0,t:0};
 function townImg(){if(!TOWN.img){const i=new Image();i.onload=()=>{TOWN.ok=true};i.src='sprites/town.webp';TOWN.img=i}return TOWN.ok?TOWN.img:null}
 const T_PLACES=[
- {k:'gate',label:'The Edge of Time',box:[262,160,126,128],aria:'The Edge of Time: enter the dungeon'},
- {k:'memorial',label:'Memorial Stone',box:[104,330,96,112],aria:'The Memorial Stone'},
- {k:'wizard',label:'Wizard\'s Tower',box:[482,140,140,420],lblY:300,aria:'The Wizard\'s Tower'},
- {k:'tavern',label:'The Tavern',box:[24,512,214,168],aria:'The Tavern'},
- {k:'cottage',label:'Your Cottage',box:[500,776,142,124],aria:'Your Cottage: gear'},
- {k:'party',label:'The Campfire',box:[250,850,150,150],aria:'The Campfire: choose your party'},
- {k:'shop',label:'General Store',box:[4,936,134,120],aria:'The General Store'}
+ {k:'gate',label:'The Edge of Time',box:[262,160,126,128],mk:[325,168],aria:'The Edge of Time: enter the dungeon'},
+ {k:'memorial',mk:[151,326],label:'Memorial Stone',box:[104,330,96,112],aria:'The Memorial Stone'},
+ {k:'wizard',mk:[548,488],label:'Wizard\'s Tower',box:[482,140,140,420],lblY:300,aria:'The Wizard\'s Tower'},
+ {k:'tavern',mk:[115,508],label:'The Tavern',box:[24,512,214,168],aria:'The Tavern'},
+ {k:'cottage',mk:[568,768],label:'Your Cottage',box:[500,776,142,124],aria:'Your Cottage: gear'},
+ {k:'party',mk:[325,846],label:'The Campfire',box:[250,850,150,150],aria:'The Campfire: choose your party'},
+ {k:'shop',mk:[68,928],label:'General Store',box:[4,936,134,120],aria:'The General Store'}
 ];
 // points of interest on the painting (canvas pixels)
 const TP={rift:[325,229],crystal:[548,282],spire:[548,150],clock:[548,355],memo:[151,371],fire:[325,910],spout:[322,646],
@@ -1667,9 +1678,28 @@ function drawTown(cv){
   /* the wizard waits by his tower door; the hero stands in the square */
   {const f=BAT.frame,tt=still?0:f%720,wk=tt>600&&tt<660?'wiz_wave':tt>=660&&tt<700?'wiz_spark':'wiz_idle'+((still?0:(f>>5))%3);
     drawChar(g,wk,508,550,{s:.8});drawChar(g,'hero_town',392,744,{s:.75})}
+  /* subtle place markers: a small bobbing gold diamond over each place */
+  T_PLACES.forEach((pl,k)=>{if(!pl.mk)return;const[x,y0]=pl.mk,y=y0+(still?0:Math.round(Math.sin(t*2.2+k)*3)),a=still?.8:.55+.35*Math.sin(t*2.2+k);
+    g.save();g.globalCompositeOperation='lighter';glow(g,x,y,22,'255,210,120',.3*a);g.restore();
+    g.globalAlpha=a;g.fillStyle='#ffe6a0';g.fillRect(x-2,y-8,5,17);g.fillRect(x-8,y-2,17,5);g.fillRect(x-4,y-4,9,9);g.fillStyle='#fff8dc';g.fillRect(x-2,y-2,5,5);g.globalAlpha=1});
   /* the hiccup ripple */
   if(frozen){const u=(cyc-10.2)/.6;g.save();g.strokeStyle=`rgba(200,140,255,${.45*(1-u)})`;g.lineWidth=3;g.beginPath();
     g.ellipse(TP.rift[0],TP.rift[1],40+u*620,30+u*460,0,0,6.283);g.stroke();g.fillStyle=`rgba(120,80,200,${.08*Math.sin(u*Math.PI)})`;g.fillRect(0,0,TWc,THc);g.restore()}
+}
+// Round buttons down the map's edges (since 0.7.6). [x,y] are canvas pixels on the painting, kept to trees and grass.
+const T_ICON={
+ menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
+ tree:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
+ gate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 21V8a7 7 0 0 1 14 0v13"/><path d="M12 9.5a2.5 2.5 0 1 1-2.5 2.5c0-2.8 2.2-5 5-5a5 5 0 0 1 5 5"/></svg>',
+ tune:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'};
+function townRound(){
+  const pts=pointsFree(),B=[
+   {a:'menu',x:44,y:200,cap:'Menu',aria:'Main menu'},
+   {a:'tree',x:608,y:640,cap:'Skills',aria:'Skill tree'+(pts>0?`, ${pts} point${pts>1?'s':''} to spend`:''),badge:pts>0?String(pts):''},
+   {place:'gate',x:604,y:978,cap:'Dungeon',aria:'Enter the dungeon',cls:'go'}];
+  if(SET.tools)B.push({a:'tune',x:44,y:330,cap:'Tuning',aria:'Tuning and test tools'});
+  return B.map(b=>`<button class="tround ${b.cls||''}" ${b.place?`data-place="${b.place}"`:`data-a="${b.a}"`} aria-label="${esc(b.aria)}"
+    style="left:${b.x/TWc*100}%;top:${b.y/THc*100}%">${T_ICON[b.place||b.a]}<span class="tcap">${b.cap}</span>${b.badge?`<span class="tbadge">${b.badge}</span>`:''}</button>`).join('');
 }
 function townMapHTML(){
   const tavBadge=M.tavern.some(r=>r.stranger)?'?':(M.freeHires>0?'!':'');
@@ -1678,11 +1708,12 @@ function townMapHTML(){
   const extra={tavern:tavBadge==='?'?', someone familiar is waiting':'',memorial:`, ${lostN} names`};
   return `<div class="tmap"><canvas id="town" width="${TWc}" height="${THc}" role="img" aria-label="Pixel map of the hamlet"></canvas>
     ${T_PLACES.map(p=>{const[x,y,w,h]=p.box;return `<button class="tplace" data-place="${p.k}" aria-label="${esc(p.aria+(extra[p.k]||''))}"
-      style="left:${x/TWc*100}%;top:${y/THc*100}%;width:${w/TWc*100}%;height:${h/THc*100}%${p.lblY?`;justify-content:flex-start;padding-top:${p.lblY/TWc*100}%`:''}">${badge[p.k]?`<span class="tbadge">${badge[p.k]}</span>`:''}<span class="tlbl">${esc(p.label)}</span></button>`}).join('')}</div>`;
+      style="left:${x/TWc*100}%;top:${y/THc*100}%;width:${w/TWc*100}%;height:${h/THc*100}%${p.lblY?`;justify-content:flex-start;padding-top:${p.lblY/TWc*100}%`:''}">${badge[p.k]?`<span class="tbadge">${badge[p.k]}</span>`:''}<span class="tlbl">${esc(p.label)}</span></button>`}).join('')}
+    ${townRound()}</div>`;
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.5';
+const GAME_VERSION='0.7.6';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1907,11 +1938,9 @@ function renderTown(){
     <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">The Hamlet</h1></div>
       <div style="text-align:right;display:flex;gap:16px"><div><div class="eyebrow">Gold</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.gold||0}</div></div><div><div class="eyebrow">Crystals</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.crystals}</div></div></div></div>
     ${townMapHTML()}
-    <p class="small" style="text-align:center;margin:0">Tap a place on the map.</p>
+    <p class="small" style="text-align:center;margin:0">Tap a glowing marker to visit. Press and hold the map to see the names.</p>
     <div class="chips">${pm.map(c=>`<span class="chip"><b style="color:${c.key==='hero'||c.stranger?'inherit':c.colour}">${esc(c.name)}</b> ${CLASSES[c.key].cls} ${c.lvl}</span>`).join('')}</div>
-    <button class="btn" data-a="tree">Skill tree${pointsFree()>0?` · <b style="color:var(--brass)">${pointsFree()} point${pointsFree()>1?'s':''} to spend</b>`:''}</button>
-    <button class="btn primary" data-place="gate">Enter the dungeon</button>
-    <div class="row"><button class="btn ghost" data-a="menu">Main menu</button>${SET.tools?'<button class="btn ghost" data-a="tune">Tuning and test tools</button>':''}</div>${foot()}</section>`;
+${foot()}</section>`;
   if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
 }
 const SHOP_LINES=['Back again? Funny, I could swear I sold you that yesterday.','Everything must go. It always does, round here.','Gold only. Crystals give me a headache.','Stock comes back every morning. Don\'t ask me how.'];
@@ -2321,6 +2350,12 @@ document.addEventListener('click',e=>{
       hire(UI.hireId,name);UI.sheet='tavern';save();render();break}
   }
 });
+// press and hold the hamlet map to show every place name; let go to hide them
+{let hold=null,held=false;const end=()=>{clearTimeout(hold);hold=null;const m=document.querySelector('.tmap.names');if(m)setTimeout(()=>m.classList.remove('names'),900)};
+  document.addEventListener('pointerdown',e=>{const m=e.target.closest&&e.target.closest('.tmap');if(!m||e.target.closest('.tround'))return;hold=setTimeout(()=>{m.classList.add('names');held=true},380)});
+  document.addEventListener('click',e=>{if(held&&e.target.closest&&e.target.closest('.tmap')){e.stopPropagation();e.preventDefault()}held=false},true);
+  document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.tmap'))e.preventDefault()});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>document.addEventListener(ev,end));}
 document.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-place]');if(g&&(e.key==='Enter'||e.key===' ')){e.preventDefault();g.dispatchEvent(new MouseEvent('click',{bubbles:true}))}});
 document.addEventListener('input',e=>{
   const t=e.target;
@@ -2403,7 +2438,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.5",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.6",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
