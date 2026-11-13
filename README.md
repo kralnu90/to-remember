@@ -20,6 +20,12 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.9.0 · 13 November 2026
+- **The fate reflections.** The loop after the Paradox Regent falls, the Hollow Champion waits in the echoes: the hero as fate intended, built from your own stats, mirroring your two strongest skill-tree paths, copying your moves, and countering any ability one of you uses three times in a row (Perfect Recall).
+- The loop after that, the wizard warns you, and then the **Last Rememberer** appears: the wizard who gave up. He uses every milestone boss's signature move, rebuilds your worst loop from the creatures on your Memorial Stone, turns your favourite skill against you, locks your best soulbound item, and charges Thirtyfold Recall, which grows with every loop you've lived.
+- **The ending.** Beat the Last Rememberer to free Bleakthorpe. Then start **New Game+** from loop 1, keeping your hero, skill tree, Sanctum, gold, crystals and worn soulbound gear, against enemies 25% tougher. Finish New Game+ and the loop is yours to play freely.
+- Two new Legendaries: the Champion's Soul and the Final Memory.
+
 ### 0.8.0 · 13 November 2026
 - **Milestone bosses.** From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes: the Forgotten King, the Clockwork Sovereign, the Maw Beneath and the Paradox Regent. Each must be beaten before the next appears, and until it falls, creatures from deeper loops stay away.
 - Each boss fights its own way: the King's Royal Decree and risen guards, the Sovereign's rewind (Slow stops it) and Overclock, the Maw's grasping tentacles and hunger, and the Regent's shifting forms, Timeline Collapse and second self.

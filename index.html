@@ -198,6 +198,7 @@ body.big .wrap{zoom:1.12}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 /* town, gear, loot */
 .r-common{color:#d8d0bd}.r-uncommon{color:#93cf7e}.r-rare{color:#7fb0e8}.r-epic{color:#c09bef}.r-legendary{color:#f0a040;text-shadow:0 0 6px rgba(240,160,64,.4)}.st.uq{color:#f0c27a;font-style:italic}
+.ending .desc{font-size:15px;line-height:1.55}.credits{margin:14px 0;text-align:center;padding:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .rlbl.boss{background:#2a2008;color:#f0c27a;border-color:#e0ae52;box-shadow:0 0 8px rgba(224,174,82,.5)}
 .sb{color:var(--brass);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
 .item{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:2px;background:var(--ink);text-align:left;min-width:0}
@@ -409,14 +410,20 @@ const MILESTONES=[
   talk:['*The ground opens. It does not speak. It only hungers.*']},
  {loop:20,key:'regent',name:'The Paradox Regent',era:'future',room:'The Throne Between Times',desc:'The throne is old, new and broken all at once. So is the one who sits on it.',
   hp:17,dmg:2.25,arm:3.75,xp:520,legend:'crown',
-  talk:['I was, I am, I will be. You are only now.','Let us see which of me you can kill.']}];
+  talk:['I was, I am, I will be. You are only now.','Let us see which of me you can kill.']},
+ {after:'regent',key:'champion',name:'The Hollow Champion',era:'past',echo:1,portrait:'champion',room:'The Day You Died',desc:'The echo of a morning you never lived to see. Someone wearing your face is already standing here.',
+  hp:1.75,dmg:.95,arm:1,xp:620,legend:'soul',
+  talk:['So you\'re the one who lived. I was supposed to be you.','Every loop you stole was mine. I\'ll take them back, one by one.']},
+ {after:'champion',key:'rememberer',name:'The Last Rememberer',era:'past',echo:1,portrait:'rememberer',room:'The Final Echo',desc:'Every loop you have lived, stacked on top of each other like pages. At the centre, an old man in a familiar hat.',
+  hp:10,dmg:1.3,arm:3.8,xp:800,legend:'memory',
+  talk:['I remember all of it. Every loop. Every name on that stone.','Why keep trying? I stopped. It was so much quieter.']}];
 const MS_BY_KEY=Object.fromEntries(MILESTONES.map(b=>[b.key,b]));
 const msRec=k=>(M&&M.ms&&M.ms[k])||{};
 const msBeaten=k=>!!msRec(k).beaten;
 function msNext(){return MILESTONES.find(b=>!msBeaten(b.key))||null}
-function msDue(loop){const b=msNext();return b&&(loop||M.loop)>=b.loop?b:null}
+function msDue(loop){const b=msNext();if(!b)return null;loop=loop||M.loop;if(b.after){const p=msRec(b.after);return p.beaten&&loop>p.beaten?b:null}return loop>=b.loop?b:null}
 // creatures more than 4 loops past the next unbeaten boss stay away
-function poolLoop(){const b=msNext();return b?Math.min(M.loop,b.loop+4):M.loop}
+function poolLoop(){const b=msNext();return b&&b.loop?Math.min(M.loop,b.loop+4):M.loop}
 const REGENT_FORMS={past:{name:'Past',arm:1.8,dmg:.8},present:{name:'Present',arm:1,dmg:1},future:{name:'Future',arm:.4,dmg:1.35}};
 const FORM_ORDER=['past','present','future'];
 function msFoe(st,B,mult){const b={name:B.name,hp:Math.round(FOE_BASE.hp*B.hp*(CFG.msHp||100)/100*(mult||1)),dmg:FOE_BASE.dmg.map(v=>Math.max(1,Math.round(v*B.dmg*(CFG.msDmg||100)/100))),
@@ -426,7 +433,7 @@ function startMilestone(st,key){
   const B=MS_BY_KEY[key];st.msFought=true;
   // time holds its breath at the threshold: the living are restored to full (the fallen stay down)
   st.party.forEach(p=>{if(!p.down){p.hp=p.maxHp;p.dots=[]}});
-  st.room={era:B.era,name:B.room,desc:B.desc,doors:{},entry:null,type:'boss',insp:0,past:!!B.past};
+  st.room={era:B.era,name:B.room,desc:B.desc,doors:{},entry:null,type:'boss',insp:0,past:!!B.past,echoBg:!!B.echo};
   DIRS.slice().sort(()=>Math.random()-.5).slice(0,rnd(1,2)).forEach(d=>st.room.doors[d]={});fillDoors(st,st.room);
   const lineup=[msFoe(st,B)];
   if(key==='king')lineup.push(FOE_BY_NAME['Bonewalker'],FOE_BY_NAME['Bonewalker']);
@@ -435,6 +442,7 @@ function startMilestone(st,key){
   const f=st.enemies[0];f.ms=key;f.phase=1;f.baseArm=f.arm;f.snapHp=f.hp;
   if(key==='king')st.enemies.slice(1).forEach(g=>{g.guard=true});
   if(key==='sovereign'&&msRec(key).lastLost){f.rewindArm=true;f.note='Hands spinning backwards';}
+  if(B.after)startReflection(st,f,B);
   if(key==='regent'){f.form=pick(FORM_ORDER);f.nextForm=FORM_ORDER[(FORM_ORDER.indexOf(f.form)+1)%3];regentForm(f)}
   M.ms=M.ms||{};M.ms[key]=Object.assign(msRec(key),{tries:(msRec(key).tries||0)+1});
   st.fight.ms={key,talk:B.talk};
@@ -447,6 +455,7 @@ function msPhase2(st,f){
   f.phase=2;
   if(f.ms==='king'){f.raises=1;log(st,'The King slams his sceptre down. "Rise, my loyal guard!"');msRaise(st,f)}
   else if(f.ms==='sovereign'){f.note=(f.note?f.note+' · ':'')+'Overclocked';log(st,'The Sovereign\'s gears scream. OVERCLOCK. It now acts twice each round.')}
+  else if(f.ms==='champion'){if(f.perks.includes('chrono')){const h=Math.round(f.maxHp*.15);f.hp=Math.min(f.maxHp,f.hp+h);log(st,`Pull Time to Heel. The Champion's wounds close (+${h}).`)}log(st,'The Champion stops fighting like you and starts fighting as you. It copies your last move each round.')}
   else if(f.ms==='maw'){st.fight.costAdd=2;f.note='Eating the room: every action +2s';log(st,'The Maw swallows the room around you. Every action now costs 2 seconds more.')}
   else if(f.ms==='regent'&&!f.isTwin){
     const tw=Object.assign({},f,{isTwin:true,form:f.nextForm,nextForm:FORM_ORDER[(FORM_ORDER.indexOf(f.nextForm)+1)%3],dots:[],uid:uid(),name:'The Paradox Regent, Again'});
@@ -465,6 +474,8 @@ function grabTurn(st,f){
   enemyHit(st,f,pick(free.length?free:st.party.filter(p=>!p.down)),.8,'lashes');
 }
 function msTurn(st,f){
+  if(f.ms==='champion')return champTurn(st,f);
+  if(f.ms==='rememberer')return rememTurn(st,f);
   const live=()=>st.party.filter(p=>!p.down);const target=()=>{const l=live();return l.find(p=>p.taunting)||pick(l)};
   const hits=(n,mult,label)=>{for(let k=0;k<n;k++){if(!live().length)return;enemyHit(st,f,target(),mult,label)}};
   if(f.ms==='king'){
@@ -494,12 +505,117 @@ function msTurn(st,f){
   }
   f.snapHp=f.hp;
 }
+/* ======================= the fate reflections (since 0.9.0) ======================= */
+// After the Regent: the Hollow Champion (the hero as fate intended) the loop after, then the Last Rememberer (the wizard
+// who gave up) the loop after that. Both fight in the echo of the past. Beating the Rememberer frees Bleakthorpe:
+// the first time leads to New Game+, finishing New Game+ unlocks free play (Kris's call).
+const BR_PERK={chrono:['Pull Time to Heel','Heals 15% when it reaches half life'],arts:['Rewind Turn','Undoes your last round once (Slow stops it)'],
+ destr:['Chain Reaction','Its hits splash 30% onto another of you'],pres:['Unbroken','Survives one killing blow at 1 life'],
+ explo:['Sixth Sense','+15% dodge'],remem:['Beyond the Loop','Rises once at 30% life']};
+const CH_SKILL_NAME=k=>{for(const c of Object.values(CLASSES)){const s=c.skills.find(x=>x.key===k);if(s)return s.name}
+  return {attack:'Attack',defend:'Defend',slow:'Slow',rturn:'Rewind Turn',taunt:'Taunt'}[k]||k};
+function startReflection(st,f,B){
+  if(B.key==='champion'){
+    const h=st.party.find(p=>p.key==='hero')||st.party[0];const n=st.party.length;
+    f.maxHp=f.hp=Math.round(h.maxHp*B.hp*(1+.75*(n-1))*(CFG.msHp||100)/100*(1+.25*(M.ngp||0)));
+    const k=(1+(h.dmgPct||0)/100)*B.dmg*(CFG.msDmg||100)/100*(1+.25*(M.ngp||0));f.dmg=[Math.max(1,Math.round(h.dmgMin*k)),Math.max(2,Math.round(h.dmgMax*k))];
+    f.arm=f.baseArm=Math.round(h.arm*.9);f.dodge=Math.min(20,h.dodge||0);f.lvl=h.lvl+2;
+    const top=BRANCHES.map(([b])=>b).sort((a,b)=>branchPts(b)-branchPts(a)).slice(0,2);
+    f.perks=(branchPts(top[0])?top:['chrono','destr']);if(f.perks.includes('explo'))f.dodge+=15;
+    f.note='Mirrors: '+f.perks.map(b=>BR_PERK[b][0]).join(', ');
+    st.fight.champ=true;st.fight.recallAt=(msRec('champion').tries||0)>=3?1:2;
+    st.party.forEach(p=>{p.lastAct=null;p.streak=0});
+  }else{
+    f.cycle=0;f.next='decree';f.note='Next: Royal Decree';
+  }
+}
+// Perfect Recall: one of you using the same ability twice in a row gets the third countered. Returns true if countered.
+function perfectRecall(st,a,act,c){
+  const F=st.fight;if(!F||!F.champ||['potion','phoenix','stopwatch','smoke'].includes(act))return false;
+  const ch=st.enemies.find(x=>x.ms==='champion'&&x.hp>0);if(!ch)return false;
+  if(a.recallAct===act){a.recallAct=null;a.streak=0;a.lastAct=null;ch.note=ch.note.replace(/ · Watching.*$/,'');
+    log(st,`Perfect Recall. The Champion saw ${CH_SKILL_NAME(act)} coming and turns it aside.`);bfx({k:'buff',a:ch,t:ch,txt:'countered'});
+    if(spend(st,c,'act')){enemyHit(st,ch,a,1.2,'counters');if(st.party.every(p=>p.down)){end(st,'wipe');return true}advance(st)}return true}
+  a.streak=a.lastAct===act?(a.streak||1)+1:1;a.lastAct=act;
+  if(a.streak>=F.recallAt){a.recallAct=act;ch.note=ch.note.replace(/ · Watching.*$/,'')+` · Watching ${a.name}'s ${CH_SKILL_NAME(act)}`;log(st,`The Champion's eyes follow ${a.name}. It has learned that move.`)}
+  return false;
+}
+function champTurn(st,f){
+  const live=()=>st.party.filter(p=>!p.down);const target=()=>{const l=live();return l.find(p=>p.taunting)||pick(l)};
+  const hit=(t,mult,label)=>{if(!t)return;const d=enemyHit(st,f,t,mult,label);
+    if(d&&f.perks.includes('destr')){const o=live().filter(p=>p!==t);if(o.length){const x=pick(o),sd=Math.max(1,Math.round(d*.3));x.hp=Math.max(0,x.hp-sd);log(st,`The blow carries on into ${x.name} for ${sd}.`);bfx({k:'ehit',f,t:x,d:sd});if(x.hp===0)fall(st,x,'boss',f)}}};
+  if(f.regenLeft>0){f.regenLeft--;const h=Math.round(f.maxHp*.04);f.hp=Math.min(f.maxHp,f.hp+h);log(st,`The Champion's wounds rewind (+${h}).`)}
+  else if(!f.rewound&&f.hp<f.maxHp*.7){f.rewound=true;f.regenLeft=3;log(st,'The Champion casts Rewind wounds on itself. Your own spell, stolen.')}
+  if(f.perks.includes('arts')&&!f.rtUsed){if(f.rewindArm){f.rewindArm=false;f.rtUsed=true;if(f.slowed){f.slowed=false;log(st,'Slow catches it mid-rewind. Rewind Turn fails.')}else{const w=f.hp;f.hp=Math.max(f.hp,f.snapHp||f.hp);log(st,`Rewind Turn. Your last round never happened (+${f.hp-w}).`)}}
+    else if(f.rounds>=3){f.rewindArm=true;log(st,'The Champion reaches for Rewind Turn. Slow it now.')}}
+  if(f.phase===2){const L=st.fight.lastParty;
+    if(L){const t=st.party.find(p=>p.id===L.id&&!p.down)||target();
+      if(ACTIONS[L.act]&&ACTIONS[L.act].heal){const h=Math.round(f.maxHp*.05);f.hp=Math.min(f.maxHp,f.hp+h);log(st,`The Champion copies ${CH_SKILL_NAME(L.act)} and heals itself (+${h}).`)}
+      else if(L.act!=='attack'&&L.act!=='defend')hit(t,1.5,`throws your ${CH_SKILL_NAME(L.act)} back at`);else hit(t,1)}}
+  if(f.rounds%3===0)hit(target(),2.2,'blasts with Time Bolt');else{hit(target(),1);hit(target(),1)}
+  f.snapHp=f.hp;
+}
+function rememTurn(st,f){
+  const live=()=>st.party.filter(p=>!p.down);const target=()=>{const l=live();return l.find(p=>p.taunting)||pick(l)};
+  const loops=Math.min(30,M.loop+(M.ngp?10:0));
+  // Thirtyfold Recall: charged, every fourth round, grows with every loop you've lived
+  if(f.recallArm){f.recallArm=false;const mult=1+.035*loops;log(st,`THIRTYFOLD RECALL. Every loop you've lived, all at once (×${mult.toFixed(2)}).`);
+    live().forEach(p=>enemyHit(st,f,p,mult,'recalls a loop onto'));if(!live().length)return}
+  else if(f.rounds%4===3){f.recallArm=true;log(st,`The Rememberer starts counting your loops. One. Two. Three... it's going to reach ${loops}.`)}
+  // a signature move from each milestone boss, in turn
+  const S2=f.next;const order=['decree','devour','rewind','collapse'];
+  if(S2==='decree'){st.fight.decree=2;log(st,'"KNEEL." The King\'s Royal Decree, in the wizard\'s voice. Your party deals 30% less damage for 2 rounds.')}
+  else if(S2==='devour'){const o=['potion','phoenix'].filter(k=>st.items[k]>0);if(o.length){const k=pick(o);st.items[k]--;log(st,`The Maw's hunger. He devours ${k==='potion'?'a potion':'a Phoenix Down'} from your pack.`)}else log(st,'He reaches into your pack and finds it empty.')}
+  else if(S2==='rewind'){f.rewindArm=true;log(st,'The Sovereign\'s rewind. His hands begin to spin backwards. Slow him now.')}
+  else if(S2==='collapse'&&!st.fight.collapse){const rule=pick(['double','halfheal','reverse']);st.fight.collapse={rule,left:3};if(rule==='reverse'){st.party.reverse();st.snap=null}
+    log(st,'The Regent\'s Timeline Collapse. For 3 rounds, '+{double:'every action costs double time.',halfheal:'all healing is halved.',reverse:'your party acts in reverse order.'}[rule])}
+  else if(S2==='collapse')log(st,'Time is already broken. He waits.');
+  if(f.rewindArm&&S2!=='rewind'){f.rewindArm=false;if(f.slowed){f.slowed=false;log(st,'Slow jams the stolen rewind.')}else{const w=f.hp;f.hp=Math.max(f.hp,Math.round(f.hp+((f.snapHp||f.hp)-f.hp)/2));log(st,`Half of your last round unravels (+${f.hp-w} life).`)}}
+  const c=st.fight.collapse;if(c&&S2!=='collapse'){if(--c.left<=0){if(c.rule==='reverse'){st.party.reverse();st.snap=null}st.fight.collapse=null;log(st,'Time settles back into its proper shape.')}}
+  f.cycle++;f.next=order[f.cycle%4];
+  const NN={decree:'Royal Decree',devour:'Devour',rewind:'Rewind',collapse:'Timeline Collapse'};
+  f.note=`Next: ${NN[f.next]}${f.recallArm?' · Thirtyfold Recall charging':''}${st.fight.cursedAct?` · Wields your ${CH_SKILL_NAME(st.fight.cursedAct)}`:''}`;
+  if(f.phase>=3&&st.fight.cursedAct){const t=target();if(t)enemyHit(st,f,t,1.7,`casts your own ${CH_SKILL_NAME(st.fight.cursedAct)} at`)}
+  if(live().length)enemyHit(st,f,target(),1);
+  f.snapHp=f.hp;
+}
+function rememPhase(st,f,ph){
+  f.phase=ph;
+  if(ph===2){const names=[...new Set((M.fallen||[]).map(x=>x.killer).filter(n=>n&&FOE_BY_NAME[n]))].slice(0,2);
+    const bases=names.length?names.map(n=>FOE_BY_NAME[n]):[FOE_BY_NAME['Loop Wraith'],FOE_BY_NAME['Loop Wraith']];
+    bases.forEach(b=>{const x=scaleFoe(st,b,'reg');x.uid=uid();x.hp=x.maxHp;st.enemies.push(x)});
+    log(st,names.length?`"Do you remember your worst loop? I do." The ${names.join(' and the ')} that took your companions step out of the dark.`:'"Do you remember your worst loop? I do." Shapes from the loops you nearly lost step out of the dark.')}
+  if(ph===3){const U=M.useCount||{};const k=Object.keys(U).sort((a,b)=>U[b]-U[a])[0]||'bolt';st.fight.cursedAct=k;
+    const h=st.party.find(p=>p.key==='hero');let best=null;if(h)for(const sl in h.gear){const it=h.gear[sl];if(it&&it.soul&&(!best||power(it.stats)>power(best.stats)))best=it}
+    if(best){best.locked=true;refresh(h);st.fight.lockedName=best.name}
+    log(st,`"I know your favourite trick." Your ${CH_SKILL_NAME(k)} now costs double time, and he uses it against you.${best?` ${best.name} goes cold and dead in your hands for this fight.`:''}`)}
+}
+function unlockGear(st){st.party.forEach(m=>{let ch=false;for(const sl in m.gear){if(m.gear[sl]&&m.gear[sl].locked){delete m.gear[sl].locked;ch=true}}if(ch)refresh(m)})}
+// New Game+: back to loop 1 with your hero, tree, Sanctum, gold, crystals and worn soulbound gear. Enemies are 25% tougher.
+function startNGPlus(){
+  const h=hero();const keep={};for(const sl in h.gear)if(h.gear[sl]&&h.gear[sl].soul)keep[sl]=h.gear[sl];h.gear=keep;
+  M.ngpPts=Math.max(M.ngpPts||0,LOOP_POINTS.filter(l=>M.loop>=l).length);
+  M.ngp=(M.ngp||0)+1;M.loop=1;M.ms={};M.chars=[h];M.party=[];M.fallen=[];M.memorial=[];M.wraith=[];M.tavern=[];M.freeHires=2;M.last=null;M.recalls=0;M.lost=0;M.useCount={};
+  M.tavern=rollTavern();M.events=[{type:'ngplus'}];
+}
+const ENDING_LINES=[
+ 'The Last Rememberer does not fall so much as stop. He looks at you with the wizard\'s tired eyes, and for a moment he almost smiles.',
+ '"Thirty times," he says. "You remembered every one." Then he is gone, and the echo with him.',
+ 'You wake in Bleakthorpe. The fountain is running. Somewhere a bell rings, and keeps on ringing, and the note finally arrives.',
+ 'The wizard is waiting at the bottom of his tower. He looks older. He looks lighter.',
+ '"You were meant to die that day," he says quietly. "I couldn\'t let it happen. I pulled on time to stop it, and time pulled back. Thirty loops of it pulling back."',
+ '"And now?" you ask.',
+ '"Now it\'s tomorrow."'];
+const ENDING_AGAIN=['The echo breaks a second time. It is easier, and somehow harder.','Bleakthorpe wakes to tomorrow again. This time, the wizard doesn\'t say anything at all. He just hands you a cup of tea and sits with you while the fountain runs.','The loop is yours now. Walk it as long as you like.'];
+
 // the Legendary drops: always soulbound, bind straight to the hero
 const LEGENDS={
  signet:{slot:'ring',name:"The King's Signet",uq:'Your critical hits make the target deal 20% less damage with its next attack.',stats:t=>({critC:6+t,critD:20+8*t,hp:4+3*t})},
  cog:{slot:'amulet',name:'The Sovereign Gear',uq:'Once per fight, dropping below 30% life rewinds 25% of your life.',stats:t=>({hp:10+6*t,tempo:6+t,arm:6+5*t})},
  heart:{slot:'chest',name:'The Abyssal Heart',uq:'Your hits heal you for 8% of the damage they deal.',stats:t=>({arm:12+10*t,hp:10+7*t,dmg:2+t})},
- crown:{slot:'helm',name:'The Paradox Crown',uq:'Each action has a 15% chance to cost no time at all.',stats:t=>({arm:8+6*t,dmg:2+t,critC:4+t,timePct:8+2*t})}};
+ crown:{slot:'helm',name:'The Paradox Crown',uq:'Each action has a 15% chance to cost no time at all.',stats:t=>({arm:8+6*t,dmg:2+t,critC:4+t,timePct:8+2*t})},
+ soul:{slot:'weapon',name:"The Champion's Soul",uq:'Your first action in every fight costs no time.',stats:t=>({dmg:3+2*t,critC:5+t,critD:15+6*t})},
+ memory:{slot:'boots',name:'The Final Memory',uq:'Every loop you\'ve lived adds +1% damage and life (up to +30%).',stats:t=>({arm:8+6*t,hp:8+5*t,dodge:3+Math.floor(t/2),tempo:5+t})}};
 const hasU=(m,k)=>!!(m&&m.gear&&Object.values(m.gear).some(it=>it&&it.uniq===k));
 function makeLegend(k,ilvl){const L=LEGENDS[k];ilvl=Math.max(1,ilvl);let t=0;MATERIALS.forEach(([,l],i)=>{if(ilvl>=l)t=i});
   const stats=L.stats(t);const base=BASE[L.slot](t);for(const s in base)stats[s]=(stats[s]||0)+Math.round(base[s]*1.8);
@@ -647,7 +763,7 @@ const LOOP_POINTS=[5,10,15,20,30];
 function treeOwned(){return (M&&M.tree&&M.tree.owned)||[]}
 function treeFx(){const o={};for(const id of treeOwned()){const n=TREE[id];if(!n)continue;for(const k in n.fx)o[k]=(o[k]||0)+n.fx[k]}return o}
 const TF=()=>treeFx();
-function pointsEarned(){if(!M)return 0;const h=hero();return Math.max(0,(h?h.lvl:1)-1)+LOOP_POINTS.filter(l=>M.loop>=l).length}
+function pointsEarned(){if(!M)return 0;const h=hero();return Math.max(0,(h?h.lvl:1)-1)+Math.max(LOOP_POINTS.filter(l=>M.loop>=l).length,M.ngpPts||0)}
 function pointsFree(){return pointsEarned()-treeOwned().length}
 function branchPts(b){return treeOwned().filter(id=>TREE[id]&&TREE[id].br===b).length}
 function treeState(id){const n=TREE[id],own=treeOwned();if(own.includes(id))return 'owned';
@@ -699,9 +815,11 @@ function calc(c,gear){
   const k=CLASSES[c.key],L=c.lvl;
   const s={maxHp:k.hp+k.grow*(L-1),dmgMin:k.dmg[0],dmgMax:k.dmg[1],dmgPct:CFG.lvlDmg*(L-1),arm:k.arm+Math.round(CFG.lvlArm*(L-1)),dodge:k.dodge,
     critC:CFG.critBase,critD:CFG.critDmg,tempo:k.tempo,timePct:0,patient:0,renew:0};
-  for(const sl in gear){const it=gear[sl];if(!it)continue;const st=it.stats;
+  let memB=0;
+  for(const sl in gear){const it=gear[sl];if(!it||it.locked)continue;const st=it.stats;if(it.uniq==='memory')memB=Math.min(30,(M&&M.loop||1)+(M&&M.ngp?10:0));
     s.maxHp+=st.hp||0;s.dmgMin+=st.dmg||0;s.dmgMax+=st.dmg||0;s.arm+=st.arm||0;s.dodge+=st.dodge||0;s.critC+=st.critC||0;s.critD+=st.critD||0;
     s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0;s.renew=Math.max(s.renew,st.renew||0)} // Renewal: only the best piece counts
+  if(memB){s.maxHp=Math.round(s.maxHp*(1+memB/100));s.dmgPct+=memB}
   if(c.talent){s.maxHp=Math.round(s.maxHp*(1+c.talent/100));s.timePct+=c.talent}
   if(c.cursed){s.maxHp=Math.round(s.maxHp*.9);s.dmgPct=(s.dmgPct||0)-10}
   if(c.key==='hero'&&M&&M.tree){const tf=TF();s.timePct+=tf.shard||0;s.tempo+=tf.tempo||0;s.dmgPct+=tf.dmg||0;s.critC+=tf.critC||0;s.critD+=tf.critD||0;
@@ -713,7 +831,7 @@ function calc(c,gear){
 function armCut(arm,lvl){return Math.min(.75,arm/(arm+CFG.armK+CFG.armLvl*Math.max(1,lvl)))}
 function refresh(m){delete m.ac;delete m.hit;delete m.dmgB;delete m.crit;const s=calc(m,m.gear);const gain=s.maxHp-(m.maxHp||s.maxHp);Object.assign(m,s);if(!m.down)m.hp=Math.max(1,Math.min(m.maxHp,(m.hp??m.maxHp)+Math.max(0,gain)))}
 function hasSkill(m,key){return skillsOf(m).some(s=>s.key===key&&m.lvl>=s.lvl)}
-function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;if(act==='bolt'&&m.key==='hero')c=Math.max(1,c+(TF().boltCost||0));if(!A.flat)c*=1-(m.tempo||0)/100;if(A.heal&&!A.flat)c*=1-(m.patient||0)/100;if(m.feared)c+=2;const F=S&&S.fight;if(F){if(F.costAdd)c+=F.costAdd;if(F.collapse&&F.collapse.rule==='double')c*=2}return Math.round(c*10)/10}
+function costOf(m,act){const A=ACTIONS[act];let c=typeof A.cost==='string'?CFG[A.cost]:A.cost;if(act==='bolt'&&m.key==='hero')c=Math.max(1,c+(TF().boltCost||0));if(!A.flat)c*=1-(m.tempo||0)/100;if(A.heal&&!A.flat)c*=1-(m.patient||0)/100;if(m.feared)c+=2;const F=S&&S.fight;if(F){if(F.cursedAct===act)c*=2;if(F.costAdd)c+=F.costAdd;if(F.collapse&&F.collapse.rule==='double')c*=2}return Math.round(c*10)/10}
 function nextXp(l){return 20+18*l}
 
 /* ======================= run engine (no DOM) ======================= */
@@ -759,7 +877,7 @@ function spend(st,s,kind){
   if(st.survival>=T(st)){end(st,'clear');return false}
   return true;
 }
-function end(st,kind){if(st.fight&&st.fight.kind==='nemesis')st.nemLost=st.fight.nem.killer;if(st.fight&&st.fight.ms&&M){M.ms=M.ms||{};M.ms[st.fight.ms.key]=Object.assign(msRec(st.fight.ms.key),{lastLost:true})}st.phase='end';st.result={kind};st.enemies=[];st.lock=kind==='clear'?'ready':'none'}
+function end(st,kind){if(st.fight&&st.fight.ms)unlockGear(st);if(st.fight&&st.fight.kind==='nemesis')st.nemLost=st.fight.nem.killer;if(st.fight&&st.fight.ms&&M){M.ms=M.ms||{};M.ms[st.fight.ms.key]=Object.assign(msRec(st.fight.ms.key),{lastLost:true})}st.phase='end';st.result={kind};st.enemies=[];st.lock=kind==='clear'||kind==='freed'?'ready':'none'}
 /* ======================= the Nemesis: the creature holding a lost companion's name ======================= */
 // A companion lost to a creature comes back (maybe) as a stranger. Their Distant Echoes bring back their memories,
 // but the last piece, their true name, is held by the creature that killed them. Once the echoes are done, a Nemesis
@@ -859,21 +977,24 @@ function treasureRoom(st){
     st.roomMsg=`A cache of time shards: +${g}s${extra.length?', plus '+extra.join(' and '):''}.`;}
 }
 function scaleFoe(st,base,tier){
-  const m=minutes(st),L=avgLvl(st)-1;
-  return {name:base.name,tier,maxHp:Math.max(1,Math.round(base.hp*(1+CFG.hpScale/100*m)*(1+CFG.lvlScale/100*L)*CFG.hpMult/100*(st.party.length===1?CFG.soloLife/100:1))),
+  const m=minutes(st),L=avgLvl(st)-1,ng=1+.25*((M&&M.ngp)||0);
+  return {name:base.name,tier,maxHp:Math.max(1,Math.round(base.hp*(1+CFG.hpScale/100*m)*(1+CFG.lvlScale/100*L)*CFG.hpMult/100*(st.party.length===1?CFG.soloLife/100:1)*ng)),
     lvl:Math.max(1,Math.round(L+1+m/5)),arm:Math.round(base.arm*(1+CFG.armScale/100*m+.1*L)),dodge:base.dodge,
-    dmg:base.dmg.map(v=>Math.max(1,Math.round(v*(CFG.dmgMult||100)/100*(1+CFG.dmgScale/100*m+CFG.dmgLvl/100*L)))),xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at,ab:base.ab||'',rank:null,mods:[],rounds:0};
+    dmg:base.dmg.map(v=>Math.max(1,Math.round(v*(CFG.dmgMult||100)/100*(1+CFG.dmgScale/100*m+CFG.dmgLvl/100*L)*ng))),xp:base.xp,attacks:st.party.length>=3?(base.attacks||1):1,bossAt:base.at,ab:base.ab||'',rank:null,mods:[],rounds:0};
 }
 function startFight(st,bases,kind){
   st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.uid=uid();f.hp=f.maxHp;if(f.tier==='elite')rankUp(f,rollRank(M.loop));if(f.ab==='shroud')f.hidden=true;return f});
   const tf=TF();st.phase='combat';st.fight={spent:0,kind,relic:!!(tf.relic&&st.relicNext),free:!!(tf.archivist&&!st.firstFightDone)};st.relicNext=false;st.firstFightDone=true;st.snap=null;st.stats.fights++;
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false;p.renewUsed=0;p.grabbed=null;p.cogUsed=false});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false;p.renewUsed=0;p.grabbed=null;p.cogUsed=false;p.soulUsed=false;p.lastAct=null;p.streak=0;p.recallAct=null});
   st.turn=st.party.findIndex(p=>!p.down);
   log(st,`${st.enemies.map(e=>(e.rank?RANKS[e.rank].name+' ':'')+e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
 function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);
   if(f.shareId){const o=st.enemies.find(x=>x.uid===f.shareId);if(o)o.hp=f.hp;if(f.hp<=0&&o&&o!==f){log(st,`${o.name} fades with it.`);BAT.fade.set(o,0)}}
-  if(f.ms&&f.phase===1&&f.hp>0&&f.hp<=f.maxHp/2)msPhase2(st,f);
+  if(f.ms==='rememberer'){if(f.phase===1&&f.hp>0&&f.hp<=f.maxHp*.66)rememPhase(st,f,2);if(f.phase===2&&f.hp>0&&f.hp<=f.maxHp*.33)rememPhase(st,f,3)}
+  else if(f.ms&&f.phase===1&&f.hp>0&&f.hp<=f.maxHp/2)msPhase2(st,f);
+  if(f.hp<=0&&f.perks){if(f.perks.includes('pres')&&!f.unbroke){f.unbroke=true;f.hp=1;log(st,'Unbroken. The Champion refuses to fall.');return}
+    if(f.perks.includes('remem')&&!f.beyond){f.beyond=true;f.hp=Math.round(f.maxHp*.3);log(st,'Beyond the Loop. The Champion steps back out of its own death.');return}}
   if(f.hp>0)return;
   if(f.ab==='grab')st.party.forEach(p=>{if(p.grabbed===f.uid){p.grabbed=null;log(st,`${p.name} is cut free.`)}});
   if(f.ab==='rise'&&!f.rose){f.rose=true;if(st.curAct==='bolt'){log(st,`Time Bolt tears the soul out of ${f.name}. It will not rise again.`)}else{f.hp=Math.round(f.maxHp*.3);log(st,`${f.name} falls... then drags itself back up.`);return}}
@@ -935,6 +1056,10 @@ function act(st,act,ti){
   const HS=['bolt','rewind','slow','rturn'];
   if(a.key==='hero'&&st.artificer&&HS.includes(act)){c=Math.round(c*5)/10;st.artificer=false}
   if(st.fight&&st.fight.free)c=0;
+  if(c>0&&hasU(a,'soul')&&!a.soulUsed){c=0;log(st,`The Champion's Soul stirs. ${a.name} acts before time notices.`)}a.soulUsed=true;
+  if(!['attack','defend','potion','phoenix','stopwatch','smoke','sacrifice'].includes(act)&&M){M.useCount=M.useCount||{};M.useCount[act]=(M.useCount[act]||0)+1}
+  if(st.fight){st.fight.lastParty={id:a.id,act}}
+  if(perfectRecall(st,a,act,c))return;
   if(c>0&&hasU(a,'paradox')&&Math.random()<.15){c=0;log(st,`The Paradox Crown flickers. ${a.name}'s action happens outside time.`)}
   switch(act){
     case 'attack':strike(st,a,foe,100);if(CLASSES[a.key].twice&&foe.hp>0)strike(st,a,foe,100);break;
@@ -1065,7 +1190,7 @@ function winFight(st){
   drops.forEach(d=>st.bag.push(d));st.stats.items+=drops.length;
   if(st.fight.kind==='boss'&&!st.fight.ms)st.bossesDone.push(st.enemies[0].bossAt);
   let legend=null;
-  if(st.fight.ms){const k=st.fight.ms.key,B=MS_BY_KEY[k];
+  if(st.fight.ms){const k=st.fight.ms.key,B=MS_BY_KEY[k];unlockGear(st);if(k==='rememberer')st.freed=true;
     if(st.fight.collapse&&st.fight.collapse.rule==='reverse')st.party.reverse();
     legend=makeLegend(B.legend,Math.max(1,Math.round(avgLvl(st))+2));st.crystals+=5;cry+=5;
     const h=st.party.find(p=>p.key==='hero');if(h){if(h.gear[legend.slot])st.bag.push(h.gear[legend.slot]);h.gear[legend.slot]=legend;refresh(h)}
@@ -1086,7 +1211,7 @@ function winFight(st){
   if(M&&M.flags)M.flags.tutorialDone=true;
   st.enemies=[];st.fight=null;st.phase='summary';
 }
-function closeSummary(st){if(st.phase==='summary'){st.phase='room';st.roomMsg='The room is quiet now.'}}
+function closeSummary(st){if(st.phase==='summary'&&st.freed){st.fight=null;end(st,'freed');return}if(st.phase==='summary'){st.phase='room';st.roomMsg='The room is quiet now.'}}
 function sacrifice(st,i){
   const m=st.party[i];if(!m||m.down||m.key==='hero')return;
   fall(st,m,'sacrifice');log(st,`${m.name} has been sacrificed (test).`);
@@ -1105,7 +1230,9 @@ function unequip(st,mi,slot){const m=st.party[mi];if(!m.gear[slot])return;st.bag
 function applyReset(){
   const st=S,ev=[];const kind=st.result.kind;
   ev.push({type:'result',kind,survival:st.survival,target:T(st),crystals:st.crystals,gold:st.gold||0});
-  if(st.msWon)ev.push({type:'milestone',key:st.msWon});
+  if(kind==='freed'){M.freedCount=(M.freedCount||0)+1;ev.push({type:'ending',ngp:M.ngp||0});if(M.ngp)M.complete=true}
+  else if(st.msWon)ev.push({type:'milestone',key:st.msWon});
+  if(st.msWon==='champion')ev.push({type:'warn'});
   M.crystals+=Math.round(st.crystals*(1+(TF().cry||0)/100));ensureEconomy();
   const tfR=TF();let beyondUsed=false;M.gold+=st.gold||0;
   for(const m of st.party){
@@ -1181,6 +1308,7 @@ function policy(st){
   }else if(hasSkill(a,'rewind')&&!st.party.some(p=>!p.down&&hasSkill(p,'mend'))&&lowF<.6&&!low.p.regen)return['rewind',low.i];
   if(hasSkill(a,'holy')&&!window.__spam&&foes.length){const w=foes.slice().sort((x,y)=>x.f.hp-y.f.hp)[0];return['holy',w.i]}
   if(st.items.potion>0&&lowF<.25)return['potion',low.i];
+  {const rw=foes.find(x=>x.f.rewindArm&&!x.f.slowed);if(rw&&hasSkill(a,'slow'))return['slow',rw.i]}
   const big=foes.slice().sort((x,y)=>y.f.hp-x.f.hp)[0],weak=foes.slice().sort((x,y)=>x.f.hp-y.f.hp)[0];
   if(hasSkill(a,'taunt')&&foes.length>=2)return['taunt',null];
   if(hasSkill(a,'volley')&&foes.length>=2)return['volley',null];
@@ -1259,6 +1387,7 @@ function wizardSheet(){
     ${speak('wizard','',n.lines)}
     <div class="events">${n.choices.map(([k,l])=>`<button class="btn" data-wiz="${k}">${esc(l)}</button>`).join('')}</div>
     <button class="btn" data-a="sanctum">The Sanctum: spend crystals</button>
+    ${M.freedCount&&!M.ngp?'<button class="btn primary" data-a="ngpask">Begin New Game+</button>':''}
     <p class="small">Lost: ${M.lost} · Remembered: ${M.recalls}</p>`;
 }
 function keeperLines(){const F=flags();if(!F.keeperMet){return KEEPER_FIRST}if(!UI.keeper||UI.keeperLoop!==M.loop){UI.keeper=pick(KEEPER_AGAIN);UI.keeperLoop=M.loop}return [UI.keeper]}
@@ -1517,6 +1646,8 @@ const FOE_LOOK={
  'The Forgotten King':{s:'paladin',flip:1,big:1,warp:1,p:{w:'#e8b840',e:'#8fd3d0',s:'#c8c0ac',a:'#5a2a3a',b:'#e8b840',o:'#2b1a22'}},
  'The Clockwork Sovereign':{s:'warrior',flip:1,big:1,p:{w:'#c89a3a',e:'#ff5a3a',s:'#a8822a',a:'#6a5a3a',b:'#e0ae52',o:'#2a2016'}},
  'The Maw Beneath':{s:'boar',big:1,warp:1,p:{k:'#2a1630',m:'#5a2a5a',e:'#ff5a6e',w:'#e8dcc8'}},
+ 'The Hollow Champion':{s:'hero',flip:1,big:1,warp:1,p:{h:'#2b2230',s:'#8a8698',e:'#e24b4a',a:'#3a3450',b:'#5a5468',w:'#6a667a',t:'#2b2230',g:'#e24b4a',o:'#16141d'}},
+ 'The Last Rememberer':{s:'mage',flip:1,big:1,warp:1,float:1,p:{h:'#1d1a26',s:'#a8a4b4',e:'#d7a6ff',a:'#2a2440',b:'#d7a6ff',t:'#16141d',g:'#d7a6ff',o:'#0e0c14'}},
  'Grasping Tentacle':{s:'thorn',p:{g:'#3a1a40',G:'#7a3a7a',e:'#ff5a6e',b:'#2a1430'}},
  'The Paradox Regent':{s:'mage',flip:1,big:1,warp:1,p:{h:'#3a3a5a',s:'#c8c0d8',e:'#e0ae52',a:'#4a3a6a',b:'#e0ae52',t:'#2b2230',g:'#d7a6ff',o:'#16141d'},
    forms:{past:{h:'#5a4a3a',s:'#c8b89a',e:'#e0ae52',a:'#6a5a3a',b:'#e8b840',t:'#3a2a1a',g:'#e8b840',o:'#2a2016'},
@@ -1609,7 +1740,7 @@ function makeBg(era,name,echo){
   const night=fut?[.56,.62,.58]:[.5,.48,.6];
   const c=A.finish(night,BC,echo?[.75,.9,1.25,.55]:null);c.meta=meta;return c;
 }
-function bgKey(){const r=S&&S.room;return r?[r.era,r.name,r.type==='echo'?'e':r.past?'p':''].join('|'):'present||'}
+function bgKey(){const r=S&&S.room;return r?[r.era,r.name,r.type==='echo'||r.echoBg?'e':r.past?'p':''].join('|'):'present||'}
 // Painted battle backdrops (since 0.7.9): Kris's three paintings of the same street, 768x432 in sprites/bg_<era>.webp,
 // cropped from tools/battle_<era>_source.jpg. past = Distant Echo rooms and the (present-day) Chapel, where the old
 // dead fight; present = the street with solar lamps and the date on the clock; future = the overgrown ruin.
@@ -1952,7 +2083,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.8.0';
+const GAME_VERSION='0.9.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2011,7 +2142,7 @@ function drawMenuArt(cv){
 function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is everything</h2>
   <div class="events">
   <div class="note"><b>Every action costs time.</b> Attacking, casting, healing and walking through a door all take seconds off your clock. Beating enemies and finding time shards gives seconds back.</div>
-  <div class="small"><b>Milestone bosses.</b> From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes. Beat each boss to go deeper and win its Legendary gear, which binds to your hero for good.</div>
+  <div class="small"><b>Milestone bosses.</b> From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes. Beat each boss to go deeper and win its Legendary gear, which binds to your hero for good. After the fourth, two reflections wait in the echoes, one loop after another.</div>
   <div class="small"><b>Survive the run.</b> Last until the survival target (30 minutes on a full run) without your clock hitting zero, and the run is cleared. Run out of time, or lose the whole party, and the loop resets.</div>
   <div class="small"><b>The loop always resets.</b> Your levels stay. Gear turns to dust unless it's <b class="sb">soulbound</b> and you're wearing it. After a cleared run you get 30 seconds of frozen time to swap gear.</div>
   <div class="small"><b>Gold and crystals.</b> Gold is kept in your enchanted purse between loops. Spend it at the General Store on supplies for your next run, and sell spare loot while time is frozen after a cleared run. Crystals bind gear (making it soulbound) at your Cottage and buy permanent upgrades in the Wizard's Sanctum.</div>
@@ -2072,6 +2203,7 @@ function renderNew(){
 }
 
 const WIZ={
+ freed:['Tomorrow. I keep saying it just to hear it.','The fountain hasn\'t stopped once. I checked. Several times.','You can stop, you know. Nobody would blame you. But I suspect you won\'t.'],
  intro:['Ah. You\'re awake. And you remember. That\'s... unusual. Don\'t worry about it. The tavern has people who could help. Go on.'],
  clear:['Survived it, did you? Splendid. Not that I doubted. I doubted a little.','Another lap of the clock. Loop {n}. Not that I\'m counting. I\'m counting.','Well done. Now do it again. That\'s rather the point.'],
  wipe:['Everyone at once? Bold strategy.','I\'d say "better luck next time", but there is always a next time. That\'s the problem.','Grab a tissue. Then grab your boots.'],
@@ -2084,11 +2216,12 @@ function wizardLine(){
   const rec=ev.find(e=>e.type==='recall');
   if(rec)return `${rec.to}... yes. I remember them too. I wondered if you would get them back.`;
   const ms=ev.find(e=>e.type==='milestone');
-  if(ms)return {king:'The King, gone at last. I knew him, once. Before. Never mind.',sovereign:'You broke the Sovereign? I built... I mean, someone built that. Well done.',maw:'The Maw is quiet. The ground feels firmer already. Thank you.',regent:'The Regent... all three of him. You remarkable fool. We\'re close now.'}[ms.key];
+  if(ms)return {king:'The King, gone at last. I knew him, once. Before. Never mind.',sovereign:'You broke the Sovereign? I built... I mean, someone built that. Well done.',maw:'The Maw is quiet. The ground feels firmer already. Thank you.',regent:'The Regent... all three of him. You remarkable fool. We\'re close now.',champion:'You beat yourself. Or the self you were meant to be. Come here, I need to tell you something.'}[ms.key];
   const due=msDue(M.loop);
-  if(due&&!(msRec(due.key).tries))return {king:'Something old has woken at the Edge. Last twenty minutes or so and you\'ll find a door that shouldn\'t be there. A king waits behind it.',sovereign:'Do you hear ticking? That\'s the Sovereign. Survive long enough and its door will find you.',maw:'The ground has been... hungry lately. Something below wants a word. A door will open, late in your run.',regent:'He\'s waiting. The Regent. Past, present and future in one tired body. Late in your run, look for his door.'}[due.key];
+  if(due&&!(msRec(due.key).tries))return {king:'Something old has woken at the Edge. Last twenty minutes or so and you\'ll find a door that shouldn\'t be there. A king waits behind it.',sovereign:'Do you hear ticking? That\'s the Sovereign. Survive long enough and its door will find you.',maw:'The ground has been... hungry lately. Something below wants a word. A door will open, late in your run.',regent:'He\'s waiting. The Regent. Past, present and future in one tired body. Late in your run, look for his door.',champion:'The loop has made something out of you. The you that died that day. It\'s in the echoes, late in your run. Be kinder to it than it will be to you.',rememberer:'It\'s waiting. It looks like me. Whatever it says, don\'t listen. I never stopped trying. Not once.'}[due.key];
   if(due)return `${due.name} is still waiting. Nothing deeper will stir until it falls. You'll find its door after twenty minutes.`;
-  const set=M.last?WIZ[M.last]:WIZ.intro;return pick(set).replace('{n}',M.loop);
+  if(M.complete||M.freedCount&&!M.ngp)return pick(WIZ.freed);
+  const set=M.last?(WIZ[M.last]||WIZ.clear):WIZ.intro;return pick(set).replace('{n}',M.loop);
 }
 function rosterHTML(){
   const comps=M.chars.filter(c=>c.key!=='hero'),h=hero();
@@ -2183,7 +2316,7 @@ function renderTown(){
   if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
   if(UI.tour==null&&!UI.sheet&&!flags().tourDone)UI.tour=0;
   app.innerHTML=`<section style="display:grid;gap:12px;padding-top:8px">
-    <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">Bleakthorpe</h1></div>
+    <div class="turnline"><div><div class="eyebrow">Aetherfall · ${M.complete?'Freed':M.ngp?'New Game+':'the Past'} · Loop ${M.loop}</div><h1 style="font-size:30px">Bleakthorpe</h1></div>
       <div style="text-align:right;display:flex;gap:16px"><div><div class="eyebrow">Gold</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.gold||0}</div></div><div><div class="eyebrow">Crystals</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.crystals}</div></div></div></div>
     ${townMapHTML()}
 </section>`;
@@ -2368,7 +2501,7 @@ function fightView(){
   const foes=S.enemies.map((f,i)=>{const traits=[f.ab&&AB_SHORT[f.ab]].concat((f.mods||[]).map(k=>MODS[k][0])).filter(Boolean);
     return `<button class="card ${f.hp<=0?'dead':''} ${f.tier!=='reg'?'elite':''} ${f.rank==='nemesis'?'nemesis':''} ${pt==='enemy'&&f.hp>0?'target':''}" data-foe="${i}" ${f.hp<=0?'disabled':''} title="${esc([f.ab?ABILITY_INFO[f.ab]:''].concat((f.mods||[]).map(k=>MODS[k][0]+': '+MODS[k][1])).filter(Boolean).join(' · '))}">
       ${f.tier!=='reg'||f.rank?`<span class="tag">${f.ms?'Boss':f.tier==='boss'?'Mini-boss':f.rank?RANKS[f.rank].name:'Elite'}</span>`:''}
-      <span class="nm">${esc(f.name)}</span><span class="sub">${f.hp}/${f.maxHp} life${f.arm?` · ${Math.round(armCut(f.arm,a.lvl)*100)}% armour`:''}${f.dodge?` · ${f.dodge}% dodge`:''}</span>${f.hidden?' · hidden':''}${f.charging?' · charging!':''}${f.note?` · <b style="color:#f0c27a">${esc(f.note)}</b>`:''}${f.holding?' · holding someone':''}</span>${traits.length?`<span class="traits">${traits.join(' · ')}</span>`:''}<span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`}).join('');
+      <span class="nm">${esc(f.name)}</span><span class="sub">${f.hp}/${f.maxHp} life${f.arm?` · ${Math.round(armCut(f.arm,a.lvl)*100)}% armour`:''}${f.dodge?` · ${f.dodge}% dodge`:''}</span>${f.hidden?' · hidden':''}${f.charging?' · charging!':''}${f.holding?' · holding someone':''}</span>${f.note?`<span class="sub" style="color:#f0c27a;font-weight:700">${esc(f.note)}</span>`:''}${traits.length?`<span class="traits">${traits.join(' · ')}</span>`:''}<span class="hp"><i style="width:${f.hp/f.maxHp*100}%"></i></span></button>`}).join('');
   let acts;
   if(p){acts=`<div class="note">${{enemy:'Tap an enemy',ally:'Tap an ally in your party',downed:'Tap a fallen ally',sacrifice:'Tap a companion to sacrifice'}[pt]}.</div><button class="btn" data-a="cancel">Cancel</button>`}
   else{
@@ -2379,7 +2512,7 @@ function fightView(){
   return `<section class="room">
     <div class="turnline"><h2>${esc(S.room.name)}</h2><span class="era ${S.room.era}">${S.room.era}</span></div>
     ${S.fight&&S.fight.nem&&S.fight.spent<1?speak('shadow',S.fight.nem.killer+' · Nemesis',S.fight.nem.talk):''}
-    ${S.fight&&S.fight.ms&&S.fight.spent<1?speak('shadow',MS_BY_KEY[S.fight.ms.key].name,S.fight.ms.talk):''}
+    ${S.fight&&S.fight.ms&&S.fight.spent<1?speak(MS_BY_KEY[S.fight.ms.key].portrait||'shadow',MS_BY_KEY[S.fight.ms.key].name,S.fight.ms.talk):''}
     ${S.fight&&(S.fight.decree>0||S.fight.costAdd||S.fight.collapse)?`<div class="note" style="border-color:#e0ae52">${[S.fight.decree>0?`Royal Decree: your party deals 30% less damage (${S.fight.decree} round${S.fight.decree>1?'s':''})`:'',S.fight.costAdd?`The Maw is eating the room: every action +${S.fight.costAdd}s`:'',S.fight.collapse?`Timeline Collapse: ${{double:'actions cost double time',halfheal:'healing is halved',reverse:'your party acts in reverse order'}[S.fight.collapse.rule]} (${S.fight.collapse.left} round${S.fight.collapse.left>1?'s':''})`:''].filter(Boolean).join('<br>')}</div>`:''}
     ${battleCanvas()}
     <div class="foes">${foes}</div>
@@ -2399,8 +2532,8 @@ function partyView(){
 }
 function endView(){
   const k=S.result.kind,s=S.stats;
-  const title={clear:'Run cleared',timeout:'Out of time',wipe:'Your party has fallen'}[k];
-  const line={clear:'You survived to the end of the run. Time freezes as the loop snaps back.',timeout:'The last grain of time ran out. Dust. Ash. Lost in the winds.',wipe:'Screw up, it’s on you. Grab a tissue and go again.'}[k];
+  const title={clear:'Run cleared',timeout:'Out of time',wipe:'Your party has fallen',freed:'Bleakthorpe is free'}[k];
+  const line={clear:'You survived to the end of the run. Time freezes as the loop snaps back.',timeout:'The last grain of time ran out. Dust. Ash. Lost in the winds.',wipe:'Screw up, it’s on you. Grab a tissue and go again.',freed:'The final echo breaks. For the first time in thirty loops, time stops pulling back.'}[k];
   const down=S.party.filter(m=>m.down&&m.key!=='hero');
   let win='';
   if(S.lock==='ready'||S.lock==='running'){
@@ -2447,6 +2580,7 @@ function renderSheet(){
   else if(kind==='newconfirm')h=`<h2>Start a new game?</h2><p class="desc">This deletes your hero, companions, crystals and loops on this device, and starts again from loop 1.</p>
     <div class="row"><button class="btn" data-a="close">Keep my save</button><button class="btn primary" data-a="newyes">Start again</button></div>`;
   else if(kind==='hire')h=hireSheet();
+  else if(kind==='ngpask')h=`<h2>Begin New Game+?</h2><p class="desc">Back to loop 1. You keep your hero, skill tree, Sanctum, gold, crystals and worn soulbound gear. Companions, bosses and the story start again, and enemies are 25% tougher.</p><div class="row"><button class="btn" data-a="close">Not yet</button><button class="btn primary" data-a="ngpgo">Begin</button></div>`;
   else if(kind==='partyinfo')h=partyInfoSheet();
   else if(kind==='events')h=eventsSheet();
   else if(kind==='abandon')h=`<h2>Abandon this run?</h2><p class="desc">It counts as running out of time: anyone who's down is lost, and only equipped soulbound gear is kept.</p>
@@ -2505,8 +2639,13 @@ function eventsSheet(){
   const ev=M.events||[];
   const parts=ev.map(e=>{
     if(e.type==='intro')return `<div class="note">You wake in a quiet hamlet that time forgot. You remember everything. Nobody else does.</div>`;
-    if(e.type==='result')return `<div><div class="eyebrow">The loop resets${e.gold?` · +${e.gold} gold kept in your purse`:''}</div><h2>${{clear:'Run cleared',timeout:'Out of time',wipe:'Party wiped'}[e.kind]}</h2><div class="small">Survived ${fmt(e.survival)} of ${fmt(e.target)}${e.crystals?` · brought back ${e.crystals} crystal${e.crystals>1?'s':''}`:''}</div></div>`;
-    if(e.type==='milestone'){const B=MS_BY_KEY[e.key],nx=msNext();return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">Milestone</div><b>${esc(B.name)}</b> is beaten. <b>${esc(LEGENDS[B.legend].name)}</b> is bound to you forever.${nx?` Deeper things stir in the dungeon. ${nx.loop<=M.loop?'Another door is waiting.':'The next waits at loop '+nx.loop+'.'}`:''}</div>`}
+    if(e.type==='result')return `<div><div class="eyebrow">The loop resets${e.gold?` · +${e.gold} gold kept in your purse`:''}</div><h2>${{freed:'Bleakthorpe is free',clear:'Run cleared',timeout:'Out of time',wipe:'Party wiped'}[e.kind]}</h2><div class="small">Survived ${fmt(e.survival)} of ${fmt(e.target)}${e.crystals?` · brought back ${e.crystals} crystal${e.crystals>1?'s':''}`:''}</div></div>`;
+    if(e.type==='warn')return speak('wizard','The wizard',['There\'s something I should have told you sooner.','The last door... it will wear my face. It isn\'t me. It\'s what I\'d have become if I\'d given up. Fate built it out of the parts of me that stopped trying.','It knows every loop you\'ve lived. Every name on that stone. Don\'t let it tell you they were your fault.','Next loop, it will be waiting. I\'m sorry I can\'t come with you.']);
+    if(e.type==='ending'){const L=e.ngp?ENDING_AGAIN:ENDING_LINES;return `<div class="ending"><div class="eyebrow">${e.ngp?'New Game+ · ':''}The end of the loop</div><h2>Tomorrow</h2>${L.map(l=>`<p class="desc">${esc(l)}</p>`).join('')}
+      <div class="credits"><div class="eyebrow">30 × to Remember</div><p class="small">A Kralnu Games game.<br>Ideas, design and testing by Kris.<br>Built with Claude, an AI by Anthropic.<br>Thank you for remembering.</p></div>
+      ${e.ngp?`<div class="note" style="border-color:#e0ae52">You've freed Bleakthorpe twice. The loop is yours now: keep playing as long as you like.</div>`:`<div class="note" style="border-color:#e0ae52"><b>New Game+</b> is ready. Start again from loop 1 with your hero, skill tree, Sanctum, gold, crystals and the soulbound gear you're wearing. The companions, the bosses and the story begin again, and every enemy is 25% tougher.</div>`}</div>`}
+    if(e.type==='ngplus')return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">New Game+</div>You wake in Bleakthorpe. Again. The fountain is frozen. Again. But you remember everything, even the loop where you won.</div>`;
+    if(e.type==='milestone'){const B=MS_BY_KEY[e.key],nx=msNext();return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">Milestone</div><b>${esc(B.name)}</b> is beaten. <b>${esc(LEGENDS[B.legend].name)}</b> is bound to you forever.${nx?(nx.after?' Something is coming for you next loop.':` Deeper things stir in the dungeon. ${nx.loop<=M.loop?'Another door is waiting.':'The next waits at loop '+nx.loop+'.'}`):''}</div>`}
     if(e.type==='lost')return `<div class="note" style="border-color:var(--bad)"><b>${esc(e.name)}</b> the ${e.cls.toLowerCase()} is gone. The loop took them.</div>`;
     if(e.type==='beyond')return `<div class="note"><b>${esc(e.name)}</b> was down when the loop reset, but your memory held them. Beyond the Loop kept them with you.</div>`;
     if(e.type==='anchor')return `<div class="small">Anchor kept <b>${esc(e.name)}</b>.</div>`;
@@ -2522,7 +2661,8 @@ function eventsSheet(){
       <q class="desc" style="text-align:center">...that's my name. You gave me that name.</q><span class="small">Talent unlocked: +${e.p}% max HP and +${e.p}% time from drops.</span></div>`;
     return '';
   }).join('');
-  return `<div class="events">${parts}</div><button class="btn primary" data-a="eventsok">Continue</button>`;
+  const end1=ev.find(e=>e.type==='ending'&&!e.ngp);
+  return `<div class="events">${parts}</div>${end1?`<button class="btn primary" data-a="ngpgo">Begin New Game+</button><button class="btn" data-a="eventsok">Not yet: stay in Bleakthorpe</button>`:`<button class="btn primary" data-a="eventsok">${ev.some(e=>e.type==='ending')?'Keep looping':'Continue'}</button>`}`;
 }
 function tuneSheet(){
   return `<div class="eyebrow">Tuning</div><h2>Change the numbers</h2>
@@ -2598,6 +2738,8 @@ document.addEventListener('click',e=>{
     case 'sanctum':UI.sheet='sanctum';render();break;
     case 'tree':UI.sheet='tree';render();break;
     case 'partyinfo':UI.sheet='partyinfo';render();break;
+    case 'ngpask':UI.sheet='ngpask';render();break;
+    case 'ngpgo':startNGPlus();UI.eventsSeen=false;UI.sheet='events';UI.wiz=null;save();render();break;
     case 'tournext':if(UI.tour>=TOUR.length-1){UI.tour=null;flags().tourDone=true;save()}else UI.tour++;render();break;
     case 'tourback':UI.tour=Math.max(0,UI.tour-1);render();break;
     case 'tourskip':UI.tour=null;flags().tourDone=true;save();render();break;
@@ -2708,7 +2850,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.8.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.9.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
