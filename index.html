@@ -390,11 +390,11 @@ const PREFIX=[ // [key, tickets, label, stat, amount(tier)]
  ['keen',15,'Keen','critC',t=>2+t],['nimble',8,'Nimble','dodge',t=>2+Math.floor(t/2)],['timeworn',5,'Timeworn','tempo',t=>3+t],
  ['echoing',3,'Echoing','timePct',t=>5+2*t],['patient',4,'Patient','patient',t=>10+2*t]];
 const SUFFIX=[['bear',20,'of the Bear','hp',t=>4+2*t],['ruin',20,'of Ruin','dmg',t=>1+t],['wall',15,'of the Wall','arm',t=>4+4*t],
- ['prec',15,'of Precision','critD',t=>10+5*t],['wind',8,'of the Wind','dodge',t=>2+Math.floor(t/2)],['hour',5,'of the Hour','tempo',t=>3+t],['echo',3,'of Echoes','timePct',t=>5+2*t]];
+ ['prec',15,'of Precision','critD',t=>10+5*t],['wind',8,'of the Wind','dodge',t=>2+Math.floor(t/2)],['hour',5,'of the Hour','tempo',t=>3+t],['echo',3,'of Echoes','timePct',t=>5+2*t],['renew',4,'of Renewal','renew',t=>2+2*t]];
 const BASE={weapon:t=>({dmg:1+2*t}),offhand:t=>({arm:6+6*t}),helm:t=>({arm:3+3*t,hp:2+2*t}),chest:t=>({arm:6+6*t,hp:3+3*t}),
  gloves:t=>({critC:1+Math.floor(t/2)}),boots:t=>({arm:3+3*t}),ring:t=>({critD:5+5*t,hp:2+2*t}),amulet:t=>({hp:4+4*t})};
-const STAT_LABEL={hp:'Life',dmg:'Damage',arm:'Armour',critC:'% Crit chance',critD:'% Crit damage',dodge:'% Dodge',tempo:'% Tempo',timePct:'% time drops',patient:'% cheaper heals'};
-const STAT_ORDER=['dmg','critC','critD','arm','dodge','hp','tempo','timePct','patient'];
+const STAT_LABEL={hp:'Life',dmg:'Damage',arm:'Armour',critC:'% Crit chance',critD:'% Crit damage',dodge:'% Dodge',tempo:'% Tempo',timePct:'% time drops',patient:'% cheaper heals',renew:'Life per turn (up to 25% a fight)'};
+const STAT_ORDER=['dmg','critC','critD','arm','dodge','hp','tempo','timePct','patient','renew'];
 const PCT_STATS=['critC','critD','dodge','tempo','timePct','patient'];
 // old saves: turn D&D stats on gear into the new ones
 function migrateItem(it){const s=it.stats;if(!s)return;
@@ -421,7 +421,7 @@ function makeItem(ilvl,minRarity){
   if(rarity==='rare'||rarity==='epic'){const sk=tickets(SUFFIX.map(x=>[x[0],x[1]]));const s=SUFFIX.find(x=>x[0]===sk);suf=' '+s[2];add(s[3],s[4](t))}
   return {id:uid(),slot,rarity,lvl:ilvl,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<Math.min(40,CFG.soulbound+2*rank('thread')+(TF().soul||0))};
 }
-function power(stats){const w={hp:.5,dmg:3,arm:.6,critC:2,critD:.4,dodge:2.5,tempo:2,timePct:1,patient:.5};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
+function power(stats){const w={hp:.5,dmg:3,arm:.6,critC:2,critD:.4,dodge:2.5,tempo:2,timePct:1,patient:.5,renew:3};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
 function statLine(stats){return STAT_ORDER.filter(k=>stats[k]).map(k=>PCT_STATS.includes(k)?`+${stats[k]}${STAT_LABEL[k]}`:`+${stats[k]} ${STAT_LABEL[k]}`).join(' · ')||'No bonus'}
 
 /* ======================= gold, the General Store, binding and the Sanctum ======================= */
@@ -562,10 +562,10 @@ function hireCost(r){if(M.freeHires>0)return 0;return 2+Math.floor(r.lvl/3)}
 function calc(c,gear){
   const k=CLASSES[c.key],L=c.lvl;
   const s={maxHp:k.hp+k.grow*(L-1),dmgMin:k.dmg[0],dmgMax:k.dmg[1],dmgPct:CFG.lvlDmg*(L-1),arm:k.arm+Math.round(CFG.lvlArm*(L-1)),dodge:k.dodge,
-    critC:CFG.critBase,critD:CFG.critDmg,tempo:k.tempo,timePct:0,patient:0};
+    critC:CFG.critBase,critD:CFG.critDmg,tempo:k.tempo,timePct:0,patient:0,renew:0};
   for(const sl in gear){const it=gear[sl];if(!it)continue;const st=it.stats;
     s.maxHp+=st.hp||0;s.dmgMin+=st.dmg||0;s.dmgMax+=st.dmg||0;s.arm+=st.arm||0;s.dodge+=st.dodge||0;s.critC+=st.critC||0;s.critD+=st.critD||0;
-    s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0}
+    s.tempo+=st.tempo||0;s.timePct+=st.timePct||0;s.patient+=st.patient||0;s.renew=Math.max(s.renew,st.renew||0)} // Renewal: only the best piece counts
   if(c.talent){s.maxHp=Math.round(s.maxHp*(1+c.talent/100));s.timePct+=c.talent}
   if(c.cursed){s.maxHp=Math.round(s.maxHp*.9);s.dmgPct=(s.dmgPct||0)-10}
   if(c.key==='hero'&&M&&M.tree){const tf=TF();s.timePct+=tf.shard||0;s.tempo+=tf.tempo||0;s.dmgPct+=tf.dmg||0;s.critC+=tf.critC||0;s.critD+=tf.critD||0;
@@ -729,7 +729,7 @@ function scaleFoe(st,base,tier){
 function startFight(st,bases,kind){
   st.enemies=bases.map((b,i)=>{const f=scaleFoe(st,b,i===0?kind:'reg');f.hp=f.maxHp;if(f.tier==='elite')rankUp(f,rollRank(M.loop));if(f.ab==='shroud')f.hidden=true;return f});
   const tf=TF();st.phase='combat';st.fight={spent:0,kind,relic:!!(tf.relic&&st.relicNext),free:!!(tf.archivist&&!st.firstFightDone)};st.relicNext=false;st.firstFightDone=true;st.snap=null;st.stats.fights++;
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false;p.renewUsed=0});
   st.turn=st.party.findIndex(p=>!p.down);
   log(st,`${st.enemies.map(e=>(e.rank?RANKS[e.rank].name+' ':'')+e.name).join(', ')} ${st.enemies.length>1?'block':'blocks'} the way.`);
 }
@@ -825,7 +825,9 @@ function act(st,act,ti){
   if(st.enemies.every(f=>f.hp<=0)){winFight(st);return}
   advance(st);
 }
+const RENEW_CAP=25; // Renewal gear heals at most this % of max life per fight
 function startTurn(st,i){const m=st.party[i];m.defending=false;m.taunting=false;if(m.buff&&--m.buff.rounds<0)m.buff=null;
+  if(m.renew&&!m.down&&m.hp<m.maxHp){const left=Math.floor(m.maxHp*RENEW_CAP/100)-(m.renewUsed||0);const h=Math.min(m.renew,left,m.maxHp-m.hp);if(h>0){m.renewUsed=(m.renewUsed||0)+h;m.hp+=h;bfx({k:'heal',a:m,t:m,h});log(st,`${m.name}'s gear renews +${h} life.`)}}
   if(m.regen&&!m.down){const r=m.regen;const {h}=healPower(r.from,r.pct);const {real,over}=applyHeal(st,r.from,m,h);log(st,`${m.name} heals +${real}${over?` (${over} overheal)`:''} from Rewind.`);if(--r.rounds<=0)m.regen=null}}
 function advance(st){
   let i=st.turn+1;
@@ -920,7 +922,7 @@ function winFight(st){
   const net=earned-st.fight.spent,s=st.stats;
   if(s.best===null||net>s.best)s.best=net;if(s.worst===null||net<s.worst)s.worst=net;
   st.sum={gold,over:st.fight.over||0,spent:Math.round(st.fight.spent*10)/10,earned,net:Math.round(net*10)/10,xp,ups,drops,cry,nem:nemWon};
-  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false});
+  st.party.forEach(p=>{p.defending=false;p.taunting=false;p.buff=null;p.regen=null;p.dots=[];p.feared=false;p.renewUsed=0});
   if(M&&M.flags)M.flags.tutorialDone=true;
   st.enemies=[];st.fight=null;st.phase='summary';
 }
@@ -1746,7 +1748,7 @@ function townMapHTML(){
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.3';
+const GAME_VERSION='0.7.4';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2467,7 +2469,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.3",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.4",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
