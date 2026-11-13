@@ -114,6 +114,14 @@ h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;l
 @keyframes tgo{50%{box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 22px rgba(190,110,255,.85),inset 0 0 12px rgba(220,160,255,.5)}}
 @media (prefers-reduced-motion:reduce){.tround.go{animation:none}}
 .tround .tbadge{top:-4px;right:-4px;border-radius:9px}
+.tour{position:absolute;inset:0;z-index:5}
+.tour .spot{position:absolute;border-radius:14px;box-shadow:0 0 0 2px var(--brass),0 0 18px 4px rgba(224,174,82,.55),0 0 0 9999px rgba(8,6,14,.66);pointer-events:none;transition:all .25s ease}
+.tour .spot.round{border-radius:50%}.tour .spot.none{box-shadow:0 0 0 9999px rgba(8,6,14,.55)}
+.tour .tip{position:absolute;left:7%;right:7%;background:rgba(24,19,34,.97);border:1px solid var(--brass);border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.6);display:grid;gap:8px}
+.tour .tip h3{margin:0;font:700 16px var(--body);color:var(--brass)}.tour .tip p{margin:0;font-size:14px;line-height:1.4}
+.tour .tip .tnav{display:flex;align-items:center;gap:8px}.tour .tip .tnav .small{flex:1}
+.tour .tip .btn{min-height:36px;padding:6px 14px;width:auto}
+@media (prefers-reduced-motion:reduce){.tour .spot{transition:none}}
 .pmem{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
 .pmem img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#3c486e;border:2px solid var(--line)}
 .pmem .pn{font-weight:700}.pmem .ps{font:12px var(--mono);color:var(--muted,#a9a3b8);margin-top:2px}
@@ -1697,29 +1705,61 @@ const T_ICON={
  gate:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 21V8a7 7 0 0 1 14 0v13"/><path d="M12 9.5a2.5 2.5 0 1 1-2.5 2.5c0-2.8 2.2-5 5-5a5 5 0 0 1 5 5"/></svg>',
  party:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.2c2.9 0 5 2.2 5 5.3"/></svg>',
  tune:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'};
-function townRound(){
+function townButtons(){
   const pts=pointsFree(),B=[
    {a:'menu',x:44,y:200,cap:'Menu',aria:'Main menu'},
    {a:'tree',x:608,y:640,cap:'Skills',aria:'Skill tree'+(pts>0?`, ${pts} point${pts>1?'s':''} to spend`:''),badge:pts>0?String(pts):''},
    {a:'partyinfo',x:44,y:770,cap:'Party',aria:`Your party: ${1+M.party.length} of 4`,badge:`${1+M.party.length}/4`},
    {place:'gate',x:604,y:978,cap:'Dungeon',aria:'Enter the dungeon',cls:'go'}];
   if(SET.tools)B.push({a:'tune',x:44,y:330,cap:'Tuning',aria:'Tuning and test tools'});
-  return B.map(b=>`<button class="tround ${b.cls||''}" ${b.place?`data-place="${b.place}"`:`data-a="${b.a}"`} aria-label="${esc(b.aria)}"
+  return B}
+function townRound(){
+  return townButtons().map(b=>`<button class="tround ${b.cls||''}" ${b.place?`data-place="${b.place}"`:`data-a="${b.a}"`} aria-label="${esc(b.aria)}"
     style="left:${b.x/TWc*100}%;top:${b.y/THc*100}%">${T_ICON[b.place||(b.a==='partyinfo'?'party':b.a)]}<span class="tcap">${b.cap}</span>${b.badge?`<span class="tbadge">${b.badge}</span>`:''}</button>`).join('');
+}
+// First-visit tour of the hamlet (since 0.7.7). Each step spotlights a place (by T_PLACES key) or an edge button.
+const TOUR=[
+ {t:'Welcome to Bleakthorpe',p:'This little hamlet is stuck living the same day, over and over. Let me show you around.'},
+ {place:'gate',t:'The Edge of Time',p:'Step through here to enter the dungeon. Every action costs time, and the clock is always running.'},
+ {place:'tavern',t:'The Tavern',p:'This is the Tavern. Hire adventurers here! Lost companions who come back as strangers wait here too.'},
+ {place:'party',t:'The Campfire',p:'Choose who comes with you, up to four. Go in with fewer for better loot and XP, if you dare.'},
+ {place:'shop',t:'The General Store',p:'Spend gold on potions and supplies for your next run. Stock changes every loop.'},
+ {place:'cottage',t:'Your Cottage',p:'Check and change your gear here. Only soulbound gear survives when the loop resets.'},
+ {place:'wizard',t:'The Wizard\'s Tower',p:'Spend crystals in his Sanctum for permanent upgrades. He knows more than he lets on.'},
+ {place:'memorial',t:'The Memorial Stone',p:'Companions the loop takes from you are remembered here.'},
+ {btn:'partyinfo',t:'Your party',p:'See your team\'s levels, stats and XP at a glance.'},
+ {btn:'tree',t:'Skills',p:'Spend skill points on your hero\'s web of skills. A number shows here when you have points to spend.'},
+ {btn:'gate',t:'Into the dungeon',p:'A quick way through the Edge of Time.'},
+ {btn:'menu',t:'Menu',p:'Settings, how to play and more. You can replay this tour from Settings.'},
+ {names:true,t:'Lost your way?',p:'Each glowing sparkle is a place you can tap. Press and hold anywhere on the map to see every name.'}
+];
+function tourHTML(){
+  const st=TOUR[UI.tour];if(!st)return '';let spot='',cy=50;
+  if(st.place){const pl=T_PLACES.find(q=>q.k===st.place),[x,y,w,h]=pl.box,pd=6;cy=(y+h/2)/THc*100;
+    spot=`<div class="spot" style="left:calc(${x/TWc*100}% - ${pd}px);top:calc(${y/THc*100}% - ${pd}px);width:calc(${w/TWc*100}% + ${pd*2}px);height:calc(${h/THc*100}% + ${pd*2}px)"></div>`}
+  else if(st.btn){const b=townButtons().find(q=>(q.a||q.place)===st.btn);if(b){cy=b.y/THc*100;
+    spot=`<div class="spot round" style="left:${b.x/TWc*100}%;top:${b.y/THc*100}%;width:calc(clamp(42px,12.5%,56px) + 14px);aspect-ratio:1;transform:translate(-50%,-50%)"></div>`}}
+  else spot=`<div class="spot none" style="left:50%;top:50%;width:0;height:0${st.names?';box-shadow:0 0 0 9999px rgba(8,6,14,.25)':''}"></div>`;
+  const far=st.place?(()=>{const[,y,,h]=T_PLACES.find(q=>q.k===st.place).box;return cy<50?`top:calc(${(y+h)/THc*100}% + 16px)`:`bottom:calc(${100-y/THc*100}% + 16px)`})():
+    st.btn?(cy<50?`top:calc(${cy}% + 44px)`:`bottom:calc(${100-cy}% + 44px)`):'top:50%;transform:translateY(-50%)';
+  const last=UI.tour===TOUR.length-1;
+  return `<div class="tour" role="dialog" aria-label="Hamlet tour">${spot}<div class="tip" style="${far}">
+    <h3>${esc(st.t)}</h3><p>${esc(st.p)}</p>
+    <div class="tnav"><span class="small">${UI.tour+1} of ${TOUR.length}</span>${last?'':'<button class="btn ghost" data-a="tourskip">Skip</button>'}${UI.tour>0?'<button class="btn" data-a="tourback">Back</button>':''}<button class="btn primary" data-a="tournext">${last?'Got it':'Next'}</button></div></div></div>`;
 }
 function townMapHTML(){
   const tavBadge=M.tavern.some(r=>r.stranger)?'?':(M.freeHires>0?'!':'');
   const lostN=(M.memorial||[]).length;
   const badge={tavern:tavBadge,memorial:lostN?String(lostN):''};
   const extra={tavern:tavBadge==='?'?', someone familiar is waiting':'',memorial:`, ${lostN} names`};
-  return `<div class="tmap"><canvas id="town" width="${TWc}" height="${THc}" role="img" aria-label="Pixel map of the hamlet"></canvas>
+  return `<div class="tmap${UI.tour!=null&&TOUR[UI.tour]&&TOUR[UI.tour].names?' names':''}"><canvas id="town" width="${TWc}" height="${THc}" role="img" aria-label="Pixel map of the hamlet"></canvas>
     ${T_PLACES.map(p=>{const[x,y,w,h]=p.box;return `<button class="tplace" data-place="${p.k}" aria-label="${esc(p.aria+(extra[p.k]||''))}"
       style="left:${x/TWc*100}%;top:${y/THc*100}%;width:${w/TWc*100}%;height:${h/THc*100}%${p.lblY?`;justify-content:flex-start;padding-top:${p.lblY/TWc*100}%`:''}">${badge[p.k]?`<span class="tbadge">${badge[p.k]}</span>`:''}<span class="tlbl">${esc(p.label)}</span></button>`}).join('')}
-    ${townRound()}</div>`;
+    ${townRound()}${UI.tour!=null?tourHTML():''}</div>`;
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.7.6';
+const GAME_VERSION='0.7.7';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -1792,8 +1832,10 @@ function settingsSheet(){return `<div class="eyebrow">Settings</div><h2>Make it 
   <div class="field"><span class="eyebrow">Sound effects</span>${setSeg('sound',[[true,'On'],[false,'Off']])}</div>
   <div class="field"><span class="eyebrow">Text size</span>${setSeg('text',[['normal','Normal'],['large','Large']])}</div>
   <div class="field"><span class="eyebrow">Test tools</span>${setSeg('tools',[[false,'Off'],[true,'On']])}<span class="small">Shows the tuning numbers and the sacrifice button, for testing balance.</span></div>
+  ${M&&!S?`<button class="btn" data-a="tourstart">Replay the hamlet tour</button>`:''}
   ${M?`<button class="btn" data-a="wipe">Reset all progress</button>`:''}
   <p class="small">30× to Remember v${GAME_VERSION} · Saves stay on this device.</p>
+  ${foot()}
   <button class="btn primary" data-a="close">Done</button>`}
 function reviewSheet(){
   const st=UI.rvStars||0;
@@ -1939,13 +1981,13 @@ function townMap(){
 function renderTown(){
   ensureEconomy();
   if(!UI.wiz||UI.wizLoop!==M.loop){UI.wiz=wizardLine();UI.wizLoop=M.loop}
+  if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
+  if(UI.tour==null&&!UI.sheet&&!flags().tourDone)UI.tour=0;
   app.innerHTML=`<section style="display:grid;gap:12px;padding-top:8px">
     <div class="turnline"><div><div class="eyebrow">Aetherfall · the Past · Loop ${M.loop}</div><h1 style="font-size:30px">The Hamlet</h1></div>
       <div style="text-align:right;display:flex;gap:16px"><div><div class="eyebrow">Gold</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.gold||0}</div></div><div><div class="eyebrow">Crystals</div><div style="font-family:var(--mono);font-size:24px;color:var(--brass)">${M.crystals}</div></div></div></div>
     ${townMapHTML()}
-    <p class="small" style="text-align:center;margin:0">Tap a glowing marker to visit. Press and hold the map to see the names.</p>
-${foot()}</section>`;
-  if(M.events&&M.events.length&&!UI.sheet&&!UI.eventsSeen){UI.sheet='events'}
+</section>`;
 }
 const SHOP_LINES=['Back again? Funny, I could swear I sold you that yesterday.','Everything must go. It always does, round here.','Gold only. Crystals give me a headache.','Stock comes back every morning. Don\'t ask me how.'];
 function partyInfoSheet(){
@@ -2351,6 +2393,10 @@ document.addEventListener('click',e=>{
     case 'sanctum':UI.sheet='sanctum';render();break;
     case 'tree':UI.sheet='tree';render();break;
     case 'partyinfo':UI.sheet='partyinfo';render();break;
+    case 'tournext':if(UI.tour>=TOUR.length-1){UI.tour=null;flags().tourDone=true;save()}else UI.tour++;render();break;
+    case 'tourback':UI.tour=Math.max(0,UI.tour-1);render();break;
+    case 'tourskip':UI.tour=null;flags().tourDone=true;save();render();break;
+    case 'tourstart':UI.sheet=null;UI.menu=false;UI.tour=0;render();break;
     case 'respec':treeRespec();UI.treeSel=null;save();render();break;
     case 'market':if(!S.marketUsed&&TF().market){S.marketUsed=true;S.market={potion:2,phoenix:1,stopwatch:1,smoke:1};S.party.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxHp,p.hp+Math.ceil(p.maxHp*.25))});UI.sheet='market';S.roomMsg='Time runs properly here, for a moment. The party feels rested.';save()}render();break;
     case 'wizback':UI.sheet='wizard';UI.wizN=null;render();break;
@@ -2371,7 +2417,7 @@ document.addEventListener('click',e=>{
 });
 // press and hold the hamlet map to show every place name; let go to hide them
 {let hold=null,held=false;const end=()=>{clearTimeout(hold);hold=null;const m=document.querySelector('.tmap.names');if(m)setTimeout(()=>m.classList.remove('names'),900)};
-  document.addEventListener('pointerdown',e=>{const m=e.target.closest&&e.target.closest('.tmap');if(!m||e.target.closest('.tround'))return;hold=setTimeout(()=>{m.classList.add('names');held=true},380)});
+  document.addEventListener('pointerdown',e=>{const m=e.target.closest&&e.target.closest('.tmap');if(!m||e.target.closest('.tround,.tour'))return;hold=setTimeout(()=>{m.classList.add('names');held=true},380)});
   document.addEventListener('click',e=>{if(held&&e.target.closest&&e.target.closest('.tmap')){e.stopPropagation();e.preventDefault()}held=false},true);
   document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.tmap'))e.preventDefault()});
   ['pointerup','pointercancel','pointerleave'].forEach(ev=>document.addEventListener(ev,end));}
@@ -2457,7 +2503,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.7.6",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.7.7",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
