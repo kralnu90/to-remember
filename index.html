@@ -199,6 +199,7 @@ body.big .wrap{zoom:1.12}
 /* town, gear, loot */
 .r-common{color:#d8d0bd}.r-uncommon{color:#93cf7e}.r-rare{color:#7fb0e8}.r-epic{color:#c09bef}.r-legendary{color:#f0a040;text-shadow:0 0 6px rgba(240,160,64,.4)}.st.uq{color:#f0c27a;font-style:italic}
 .ending .desc{font-size:15px;line-height:1.55}.credits{margin:14px 0;text-align:center;padding:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.item.weekly{border-color:#f0a040;box-shadow:0 0 10px rgba(240,160,64,.25)}
 .smithrow{display:grid;gap:6px;margin-top:6px}.smithrow .btn{display:flex;justify-content:space-between}
 .rlbl.boss{background:#2a2008;color:#f0c27a;border-color:#e0ae52;box-shadow:0 0 8px rgba(224,174,82,.5)}
 .sb{color:var(--brass);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
@@ -1271,6 +1272,7 @@ function applyReset(){
   }
   (st.nemWins||[]).forEach(e=>ev.push(e));
   flags().firstRun=true;
+  if(kind==='clear'||kind==='freed')bountyTick(st,'clear');
   M.loop++;M.last=kind;M.store=rollStore();payBounties(ev);
   // strangers drift back to the tavern
   const back=M.fallen.filter(f=>f.returnAt!==null&&f.returnAt<=M.loop);
@@ -2214,25 +2216,58 @@ function rollBounties(){
     b.g=Math.round((15+4*hl)*diff/5)*5;b.c=diff>=1.4?2:1;b.item=Math.random()<.2;out.push(b)}
   return out;
 }
-function ensureBounties(){if(M&&!M.bounties)M.bounties=rollBounties();return M.bounties}
+// The weekly bounty (since 0.12.0): one big goal per real-world week (Monday to Sunday), counted across every run
+// that week. Pays gold, crystals and a guaranteed soulbound Rare or Epic.
+function weekKey(d){d=d?new Date(d):new Date();const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);
+  const y=t.getUTCFullYear(),w=Math.ceil(((t-Date.UTC(y,0,1))/864e5+1)/7);return y+'-W'+String(w).padStart(2,'0')}
+function daysToMonday(){const d=new Date().getDay();return d===1?7:(8-d)%7||7}
+function rollWeekly(){
+  const L=poolLoop(),hl=hero()?hero().lvl:1;
+  const fams=[...new Set([...poolFor('present',L),...poolFor('future',L),...poolFor('past',L)].map(c=>c.fam))];
+  const kind=pick(['family','elite','flawless','treasure','clear','boss']);const b={id:uid(),week:weekKey(),kind,have:0,done:false,weekly:true};
+  if(kind==='family'){b.key=pick(fams);b.need=rnd(45,60);b.text=`Slay ${b.need} ${FAM_NAME[b.key]||b.key}`}
+  else if(kind==='elite'){b.need=rnd(10,14);b.text=`Defeat ${b.need} Elite, Champion or Dread enemies`}
+  else if(kind==='flawless'){b.need=rnd(20,28);b.text=`Win ${b.need} fights without anyone falling`}
+  else if(kind==='treasure'){b.need=rnd(10,12);b.text=`Find ${b.need} caches of time shards`}
+  else if(kind==='clear'){b.need=3;b.text='Clear 3 full runs (survive all 30 minutes)'}
+  else{b.need=4;b.text='Defeat 4 mini-bosses'}
+  b.g=Math.round((60+15*hl)/5)*5;b.c=4;return b;
+}
+function ensureWeekly(){if(!M||!M.chars)return null;if(!M.weekly||(M.weekly.week!==weekKey()&&(!M.weekly.done||M.weekly.paid)))M.weekly=rollWeekly();return M.weekly}
+// the prize goes onto whoever it helps most; if it helps nobody it's packed for the next run
+function giveWeeklyPrize(it){
+  let best=null,gain=0;for(const c of M.chars){if(it.lvl>c.lvl)continue;const cur=c.gear[it.slot];const d=power(it.stats)-(cur?power(cur.stats):0);if(d>gain){gain=d;best=c}}
+  ensureEconomy();
+  if(best){const old=best.gear[it.slot];best.gear[it.slot]=it;if(old)M.pack.gear=(M.pack.gear||[]).concat([old]);return best.name}
+  M.pack.gear=(M.pack.gear||[]).concat([it]);return null;
+}
+function ensureBounties(){ensureWeekly();if(M&&!M.bounties)M.bounties=rollBounties();return M.bounties}
 function bountyTick(st,kind,arg){
   if(!M||!M.bounties||!st)return;
-  for(const b of M.bounties){if(b.done)continue;let hit=false;
+  for(const b of M.bounties.concat(M.weekly&&M.weekly.week===weekKey()?[M.weekly]:[])){if(b.done)continue;let hit=false;
     if(kind==='kill'){if(b.kind==='kill'&&b.key===arg.name)hit=true;const c=FOE_BY_NAME[arg.name];if(b.kind==='family'&&c&&c.fam===b.key)hit=true}
     else if(kind===b.kind)hit=true;
     if(!hit)continue;
     if(kind==='survive')b.have=Math.max(b.have,arg);else b.have++;
-    if(b.have>=b.need){b.have=b.need;b.done=true;log(st,`Bounty complete: ${b.text}. Collect your reward back in the village.`);if(st.phase==='room')st.roomMsg=(st.roomMsg?st.roomMsg+' ':'')+`Bounty complete: ${b.text}.`}}
+    if(b.have>=b.need){b.have=b.need;b.done=true;log(st,`${b.weekly?'Weekly bounty':'Bounty'} complete: ${b.text}. Collect your reward back in the village.`);if(st.phase==='room')st.roomMsg=(st.roomMsg?st.roomMsg+' ':'')+`Bounty complete: ${b.text}.`}}
 }
 function payBounties(ev){
   const hl=hero()?hero().lvl:1;
   (M.bounties||[]).filter(b=>b.done).forEach(b=>{M.gold=(M.gold||0)+b.g;M.crystals+=b.c;let it=null;
     if(b.item){it=makeItem(hl,Math.random()<.4?'rare':'uncommon');ensureEconomy();M.pack.gear=(M.pack.gear||[]).concat([it])}
     ev.push({type:'bounty',text:b.text,g:b.g,c:b.c,item:it&&it.name})});
-  M.bounties=rollBounties();
+  const W=M.weekly;
+  if(W&&W.done&&!W.paid){W.paid=true;M.gold=(M.gold||0)+W.g;M.crystals+=W.c;const it=makeItem(hl,Math.random()<.3?'epic':'rare');it.soul=true;const who=giveWeeklyPrize(it);
+    ev.push({type:'weekly',text:W.text,g:W.g,c:W.c,item:it.name,rar:it.rarity,who})}
+  if(W&&W.paid&&W.week!==weekKey())M.weekly=null;
+  M.bounties=rollBounties();ensureWeekly();
 }
+function weeklyHTML(){const W=ensureWeekly();if(!W)return '';const cur=W.week===weekKey(),d=daysToMonday();
+  return `<div class="item weekly ${W.done?'soul':''}"><span class="eyebrow" style="color:#f0a040">Weekly bounty · ${W.paid?'claimed':cur?`resets in ${d} day${d>1?'s':''}`:'finished, waiting for the reset'}</span>
+    <span class="nm">${W.done?'✓ ':''}${esc(W.text)}</span><span class="st">Reward: ${W.g} gold · ${W.c} crystals · a <b class="r-rare">soulbound Rare</b> or <b class="r-epic">Epic</b></span>
+    <span class="hp" style="margin-top:4px"><i style="width:${Math.round(W.have/W.need*100)}%"></i></span><span class="st">${W.paid?'Paid. A new weekly goes up on Monday.':W.done?'Done. Paid when the loop resets.':`${W.have} / ${W.need}, counted across every run this week`}</span></div>`}
 function bountiesHTML(){ensureBounties();
-  return `<div class="eyebrow">Bounties · loop ${M.loop}</div>
+  return weeklyHTML()+`<div class="eyebrow">Bounties · loop ${M.loop}</div>
     <div class="events">${M.bounties.map(b=>`<div class="item ${b.done?'soul':''}"><span class="nm">${b.done?'✓ ':''}${esc(b.text)}</span>
       <span class="st">Reward: ${b.g} gold · ${b.c} crystal${b.c>1?'s':''}${b.item?' · a piece of gear':''}</span>
       <span class="hp" style="margin-top:4px"><i style="width:${Math.round(b.have/b.need*100)}%"></i></span><span class="st">${b.done?'Done. Paid when the loop resets.':`${b.have} / ${b.need}${b.kind==='survive'?' minutes':''}`}</span></div>`).join('')}</div>
@@ -2240,7 +2275,7 @@ function bountiesHTML(){ensureBounties();
 }
 
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.11.0';
+const GAME_VERSION='0.12.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2299,7 +2334,7 @@ function drawMenuArt(cv){
 function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is everything</h2>
   <div class="events">
   <div class="note"><b>Every action costs time.</b> Attacking, casting, healing and walking through a door all take seconds off your clock. Beating enemies and finding time shards gives seconds back.</div>
-  <div class="small"><b>Bounties.</b> The Notice Board posts three each loop. Complete them during a run and collect gold, crystals and sometimes gear when the loop resets.</div>
+  <div class="small"><b>Bounties.</b> The Notice Board posts three each loop, plus one big weekly bounty that counts across every run that week and pays a soulbound Rare or Epic. Complete them during a run and collect gold, crystals and sometimes gear when the loop resets.</div>
   <div class="small"><b>Rebuild the village.</b> Spend crystals and gold at the Notice Board on projects that last forever: the Smithy (temper, reroll and upgrade gear), a bigger tavern, a training yard, an apothecary and a watchtower.</div>
   <div class="small"><b>Milestone bosses.</b> From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes. Beat each boss to go deeper and win its Legendary gear, which binds to your hero for good. After the fourth, two reflections wait in the echoes, one loop after another.</div>
   <div class="small"><b>Survive the run.</b> Last until the survival target (30 minutes on a full run) without your clock hitting zero, and the run is cleared. Run out of time, or lose the whole party, and the loop resets.</div>
@@ -2807,6 +2842,7 @@ function eventsSheet(){
       ${e.ngp?`<div class="note" style="border-color:#e0ae52">You've freed Bleakthorpe twice. The loop is yours now: keep playing as long as you like.</div>`:`<div class="note" style="border-color:#e0ae52"><b>New Game+</b> is ready. Start again from loop 1 with your hero, skill tree, Sanctum, gold, crystals and the soulbound gear you're wearing. The companions, the bosses and the story begin again, and every enemy is 25% tougher.</div>`}</div>`}
     if(e.type==='ngplus')return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">New Game+</div>You wake in Bleakthorpe. Again. The fountain is frozen. Again. But you remember everything, even the loop where you won.</div>`;
     if(e.type==='milestone'){const B=MS_BY_KEY[e.key],nx=msNext();return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">Milestone</div><b>${esc(B.name)}</b> is beaten. <b>${esc(LEGENDS[B.legend].name)}</b> is bound to you forever.${nx?(nx.after?' Something is coming for you next loop.':` Deeper things stir in the dungeon. ${nx.loop<=M.loop?'Another door is waiting.':'The next waits at loop '+nx.loop+'.'}`):''}</div>`}
+    if(e.type==='weekly')return `<div class="note" style="border-color:#f0a040"><div class="eyebrow" style="color:#f0a040">Weekly bounty paid</div>${esc(e.text)}. +${e.g} gold, +${e.c} crystals, and <b class="r-${e.rar}">${esc(e.item)}</b> (soulbound) ${e.who?`now worn by <b>${esc(e.who)}</b>`:'packed for your next run: wear it to keep it'}.</div>`;
     if(e.type==='bounty')return `<div class="note" style="border-color:#e0ae52"><b>Bounty paid:</b> ${esc(e.text)}. +${e.g} gold, +${e.c} crystal${e.c>1?'s':''}${e.item?`, and <b>${esc(e.item)}</b> packed for your next run`:''}.</div>`;
     if(e.type==='lost')return `<div class="note" style="border-color:var(--bad)"><b>${esc(e.name)}</b> the ${e.cls.toLowerCase()} is gone. The loop took them.</div>`;
     if(e.type==='beyond')return `<div class="note"><b>${esc(e.name)}</b> was down when the loop reset, but your memory held them. Beyond the Loop kept them with you.</div>`;
@@ -3015,7 +3051,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.11.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.12.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}

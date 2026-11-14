@@ -20,6 +20,9 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.12.0 · 14 November 2026
+- **Weekly bounty.** One big goal each real-world week (it resets on Monday), counted across every run you play that week. It pays gold, crystals and a guaranteed soulbound Rare or Epic, which goes straight onto whoever it suits best.
+
 ### 0.11.0 · 14 November 2026
 - **Bounties.** The Notice Board posts three new bounties every loop: slay certain creatures, beat elites or a mini-boss, find caches, win fights without anyone falling, or survive long enough. Finish them during a run and collect gold, crystals and sometimes gear when the loop resets.
 
