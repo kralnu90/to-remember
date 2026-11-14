@@ -20,6 +20,9 @@ This is an early build. Things will change, and saves may reset between versions
 
 ## Changelog
 
+### 0.11.0 · 14 November 2026
+- **Bounties.** The Notice Board posts three new bounties every loop: slay certain creatures, beat elites or a mini-boss, find caches, win fights without anyone falling, or survive long enough. Finish them during a run and collect gold, crystals and sometimes gear when the loop resets.
+
 ### 0.10.0 · 14 November 2026
 - **Rebuild Bleakthorpe.** A Notice Board in the square lets you spend crystals and gold on projects that survive every reset (and New Game+): the Smithy, a Tavern Extension, a Training Yard, an Apothecary and a Watchtower, each with upgrades.
 - **The Smithy.** Rebuild the old forge by the south road, then temper gear up to the wearer's level (Legendaries too), reroll prefixes and suffixes, and upgrade rarity up to Rare, then Epic.

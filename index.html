@@ -842,7 +842,7 @@ function partyBonus(st){return CFG['b'+st.party.length]||1}
 function avgLvl(st){return st.party.reduce((a,m)=>a+m.lvl,0)/st.party.length}
 function minutes(st){return st.survival/60}
 function log(st,t){st.log.unshift(t);if(st.log.length>40)st.log.pop()}
-function startRun(quick){
+function startRun(quick){if(M&&M.chars)ensureBounties();
   const ids=['hero'].concat(M.party);
   const party=ids.map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean).map(c=>{const m=clone(c);m.hp=null;m.maxHp=null;m.down=false;m.downAt=null;refresh(m);m.hp=m.maxHp;return m});
   party.sort((a,b)=>CLASSES[b.key].speed-CLASSES[a.key].speed);
@@ -872,7 +872,7 @@ function makeRoom(st,entry){
   const room={era,name,desc,doors,entry,type:null,insp:0};fillDoors(st,room);return room;
 }
 function spend(st,s,kind){
-  st.timeLeft-=s;st.survival+=s;st.delta=-s;
+  st.timeLeft-=s;st.survival+=s;st.delta=-s;if(M&&M.bounties&&Math.floor(st.survival/60)>Math.floor((st.survival-s)/60))bountyTick(st,'survive',Math.floor(st.survival/60));
   if(kind==='move')st.stats.spentMove+=s;else{st.stats.spentAct+=s;st.stats.actions++;if(st.fight)st.fight.spent+=s}
   const now=Date.now();st.stats.playMs+=Math.min(60000,Math.max(0,now-st.lastTick));st.lastTick=now;
   if(st.timeLeft<=0){end(st,'timeout');return false}
@@ -969,7 +969,7 @@ function fightLineup(st,r,count){
   const rest=pool.filter(c=>c.ab!=='pack');
   return [first].concat(Array.from({length:count-1},()=>rest.length?pickW(rest):first));
 }
-function treasureRoom(st){
+function treasureRoom(st){bountyTick(st,'treasure');
   {const g=Math.round(rnd(CFG.dTreasMin,CFG.dTreasMax)*partyBonus(st)*timeMult(st));
     st.timeLeft+=g;st.delta=g;st.stats.earnTreasure+=g;
     const extra=[];
@@ -1000,7 +1000,7 @@ function hitFoe(st,f,amt){f.hp=Math.max(0,f.hp-amt);
   if(f.hp>0)return;
   if(f.ab==='grab')st.party.forEach(p=>{if(p.grabbed===f.uid){p.grabbed=null;log(st,`${p.name} is cut free.`)}});
   if(f.ab==='rise'&&!f.rose){f.rose=true;if(st.curAct==='bolt'){log(st,`Time Bolt tears the soul out of ${f.name}. It will not rise again.`)}else{f.hp=Math.round(f.maxHp*.3);log(st,`${f.name} falls... then drags itself back up.`);return}}
-  log(st,`${f.name} falls.`);st.stats.kills++;
+  log(st,`${f.name} falls.`);st.stats.kills++;bountyTick(st,'kill',f);
   if(hasMod(f,'volatile')){const d=Math.max(1,Math.round(f.maxHp*.1));log(st,`${f.name} explodes! Everyone takes ${d}.`);
     st.party.forEach(p=>{if(p.down)return;p.hp=Math.max(0,p.hp-d);bfx({k:'ehit',f,t:p,d});if(p.hp===0)fall(st,p,f.tier,f)})}}
 // pct: % of weapon damage. Hits always land unless the foe dodges. Returns damage dealt.
@@ -1190,6 +1190,7 @@ function winFight(st){
   const b=partyBonus(st);gold=gainGold(st,gold*b*(1+.06*(L-1)));earned=Math.round(earned*b*timeMult(st));xp=Math.round(xp*b);
   if(TF().linger&&!st.party.some(p=>p.down))earned+=3;st.timeLeft+=earned;st.delta=earned;st.stats.earnFoes+=earned;st.crystals+=cry;
   drops.forEach(d=>st.bag.push(d));st.stats.items+=drops.length;
+  st.enemies.forEach(f=>{if(f.tier==='elite')bountyTick(st,'elite');if(f.tier==='boss'&&!f.ms)bountyTick(st,'boss')});if(!st.party.some(p=>p.down))bountyTick(st,'flawless');
   if(st.fight.kind==='boss'&&!st.fight.ms)st.bossesDone.push(st.enemies[0].bossAt);
   let legend=null;
   if(st.fight.ms){const k=st.fight.ms.key,B=MS_BY_KEY[k];unlockGear(st);if(k==='rememberer')st.freed=true;
@@ -1270,7 +1271,7 @@ function applyReset(){
   }
   (st.nemWins||[]).forEach(e=>ev.push(e));
   flags().firstRun=true;
-  M.loop++;M.last=kind;M.store=rollStore();
+  M.loop++;M.last=kind;M.store=rollStore();payBounties(ev);
   // strangers drift back to the tavern
   const back=M.fallen.filter(f=>f.returnAt!==null&&f.returnAt<=M.loop);
   M.fallen=M.fallen.filter(f=>!(f.returnAt!==null&&f.returnAt<=M.loop));
@@ -1932,7 +1933,7 @@ const T_PLACES=[
  {k:'tavern',mk:[115,508],label:'The Tavern',box:[24,512,214,168],aria:'The Tavern'},
  {k:'cottage',mk:[568,768],label:'Your Cottage',box:[500,776,142,124],aria:'Your Cottage: gear'},
  {k:'party',mk:[325,846],label:'The Campfire',box:[250,850,150,150],aria:'The Campfire: choose your party'},
- {k:'board',label:'Notice Board',box:[200,730,64,64],mk:[234,728],aria:'The Notice Board: rebuild the village'},
+ {k:'board',label:'Notice Board',box:[200,730,64,64],mk:[234,728],aria:'The Notice Board: bounties and rebuilding the village'},
  {k:'forge',label:'The Old Forge',box:[160,985,130,110],mk:[226,982],aria:'The forge'},
  {k:'shop',mk:[68,928],label:'General Store',box:[4,936,134,120],aria:'The General Store'}
 ];
@@ -2056,7 +2057,7 @@ const TOUR=[
  {place:'cottage',t:'Your Cottage',p:'Check and change your gear here. Only soulbound gear survives when the loop resets.'},
  {place:'wizard',t:'The Wizard\'s Tower',p:'Spend crystals in his Sanctum for permanent upgrades. He knows more than he lets on.'},
  {place:'memorial',t:'The Memorial Stone',p:'Companions the loop takes from you are remembered here.'},
- {place:'board',t:'The Notice Board',p:'Spend crystals and gold to rebuild Bleakthorpe. What you build here, the loop can\'t undo.'},
+ {place:'board',t:'The Notice Board',p:'Fresh bounties go up here every morning: finish them in a run for gold and crystals. You can also spend crystals and gold to rebuild Bleakthorpe. What you build, the loop can\'t undo.'},
  {place:'forge',t:'The Old Forge',p:'Rebuild it from the Notice Board, and the smith will temper, reroll and upgrade your gear.'},
  {btn:'partyinfo',t:'Your party',p:'See your team\'s levels, stats and XP at a glance.'},
  {btn:'tree',t:'Skills',p:'Spend skill points on your hero\'s web of skills. A number shows here when you have points to spend.'},
@@ -2081,7 +2082,7 @@ function tourHTML(){
 function townMapHTML(){
   const tavBadge=M.tavern.some(r=>r.stranger)?'?':(M.freeHires>0?'!':'');
   const lostN=(M.memorial||[]).length;
-  const badge={tavern:tavBadge,memorial:lostN?String(lostN):'',board:!Object.keys(M.village||{}).length&&M.crystals>=4?'!':''};
+  const badge={tavern:tavBadge,memorial:lostN?String(lostN):'',board:!Object.keys(M.village||{}).length&&M.crystals>=4?'!':String((ensureBounties()||[]).filter(b=>!b.done).length||'')};
   const extra={tavern:tavBadge==='?'?', someone familiar is waiting':'',memorial:`, ${lostN} names`};
   return `<div class="tmap${UI.tour!=null&&TOUR[UI.tour]&&TOUR[UI.tour].names?' names':''}"><canvas id="town" width="${TWc}" height="${THc}" role="img" aria-label="Pixel map of the hamlet"></canvas>
     ${T_PLACES.map(p=>{const[x,y,w,h]=p.box;return `<button class="tplace" data-place="${p.k}" aria-label="${esc(p.aria+(extra[p.k]||''))}"
@@ -2103,7 +2104,7 @@ const V=k=>(M&&M.village&&M.village[k])||0;
 function buildProject(k){const P=VILLAGE.find(x=>x.k===k),t=V(k),T=P&&P.tiers[t];if(!T||M.crystals<T.c||(M.gold||0)<T.g)return false;
   M.crystals-=T.c;M.gold-=T.g;M.village=M.village||{};M.village[k]=t+1;UI.built=k;return true}
 function boardSheet(){
-  return `<div class="eyebrow">The Notice Board · Crystals ${M.crystals} · Gold ${M.gold||0}</div><h2>Rebuild Bleakthorpe</h2>
+  return `<div class="eyebrow">The Notice Board · Crystals ${M.crystals} · Gold ${M.gold||0}</div><h2>Bounties</h2>${bountiesHTML()}<h2>Rebuild Bleakthorpe</h2>
     <p class="desc">The loop resets the day, but the wizard binds every stone you lay with crystal. Time can't unbuild what time itself paid for.</p>
     <div class="events">${VILLAGE.map(P=>{const t=V(P.k),T=P.tiers[t],can=T&&M.crystals>=T.c&&(M.gold||0)>=T.g;
       return `<div class="item ${UI.built===P.k?'soul':''}"><span class="nm">${esc(P.name)}${t?` <span class="small">· ${t>=P.tiers.length?'complete':'level '+t}</span>`:''}</span>
@@ -2194,8 +2195,52 @@ function drawBuilt(g,t,still){
   if(V('yard')){const Y=blk(410,1040,4);Y(0,6,20,1,'#6a4a2c');Y(0,4,1,4,'#4a3220');Y(19,4,1,4,'#4a3220');[[4,0],[12,0]].forEach(([x])=>{Y(x+1,2,1,7,'#4a3220');Y(x,0,3,3,'#c8a860');Y(x-1,3,5,2,'#b89848')})}
 }
 
+/* ======================= bounties on the Notice Board (since 0.11.0) ======================= */
+// Three a loop, posted fresh every morning. Progress counts during the run; finished bounties pay out at the reset.
+const FAM_NAME={beast:'beasts',arcane:'arcane creatures',undead:'undead',temporal:'temporal creatures',construct:'constructs',abyssal:'abyssal creatures'};
+function rollBounties(){
+  const L=poolLoop(),hl=hero()?hero().lvl:1,out=[];
+  const pool=[...poolFor('present',L),...poolFor('future',L),...poolFor('past',L)].filter(c=>!c.eliteOnly);
+  const fams=[...new Set(pool.map(c=>c.fam))];
+  const kinds=['kill','family','elite','treasure','survive','flawless','boss'].sort(()=>Math.random()-.5).slice(0,3);
+  for(const kind of kinds){let b={id:uid(),kind,have:0,done:false},diff=1;
+    if(kind==='kill'){const c=pick(pool);b.key=c.name;b.need=c.ab==='pack'?rnd(10,14):rnd(5,8);b.text=`Slay ${b.need} ${c.name}${b.need>1&&!/s$/.test(c.name)?'s':''}`}
+    else if(kind==='family'){b.key=pick(fams);b.need=rnd(12,18);b.text=`Slay ${b.need} ${FAM_NAME[b.key]||b.key}`;diff=1.2}
+    else if(kind==='elite'){b.need=rnd(3,5);b.text=`Defeat ${b.need} Elite, Champion or Dread enemies`;diff=1.4}
+    else if(kind==='treasure'){b.need=rnd(3,4);b.text=`Find ${b.need} caches of time shards`}
+    else if(kind==='survive'){b.need=pick([20,25,30]);b.text=b.need===30?'Clear a full run (survive all 30 minutes)':`Survive ${b.need} minutes in a single run`;diff=b.need/18}
+    else if(kind==='flawless'){b.need=rnd(7,10);b.text=`Win ${b.need} fights without anyone falling`;diff=1.2}
+    else if(kind==='boss'){b.need=1;b.text='Defeat a mini-boss: the Belltower Revenant or the Verdant Matriarch';diff=1.6}
+    b.g=Math.round((15+4*hl)*diff/5)*5;b.c=diff>=1.4?2:1;b.item=Math.random()<.2;out.push(b)}
+  return out;
+}
+function ensureBounties(){if(M&&!M.bounties)M.bounties=rollBounties();return M.bounties}
+function bountyTick(st,kind,arg){
+  if(!M||!M.bounties||!st)return;
+  for(const b of M.bounties){if(b.done)continue;let hit=false;
+    if(kind==='kill'){if(b.kind==='kill'&&b.key===arg.name)hit=true;const c=FOE_BY_NAME[arg.name];if(b.kind==='family'&&c&&c.fam===b.key)hit=true}
+    else if(kind===b.kind)hit=true;
+    if(!hit)continue;
+    if(kind==='survive')b.have=Math.max(b.have,arg);else b.have++;
+    if(b.have>=b.need){b.have=b.need;b.done=true;log(st,`Bounty complete: ${b.text}. Collect your reward back in the village.`);if(st.phase==='room')st.roomMsg=(st.roomMsg?st.roomMsg+' ':'')+`Bounty complete: ${b.text}.`}}
+}
+function payBounties(ev){
+  const hl=hero()?hero().lvl:1;
+  (M.bounties||[]).filter(b=>b.done).forEach(b=>{M.gold=(M.gold||0)+b.g;M.crystals+=b.c;let it=null;
+    if(b.item){it=makeItem(hl,Math.random()<.4?'rare':'uncommon');ensureEconomy();M.pack.gear=(M.pack.gear||[]).concat([it])}
+    ev.push({type:'bounty',text:b.text,g:b.g,c:b.c,item:it&&it.name})});
+  M.bounties=rollBounties();
+}
+function bountiesHTML(){ensureBounties();
+  return `<div class="eyebrow">Bounties · loop ${M.loop}</div>
+    <div class="events">${M.bounties.map(b=>`<div class="item ${b.done?'soul':''}"><span class="nm">${b.done?'✓ ':''}${esc(b.text)}</span>
+      <span class="st">Reward: ${b.g} gold · ${b.c} crystal${b.c>1?'s':''}${b.item?' · a piece of gear':''}</span>
+      <span class="hp" style="margin-top:4px"><i style="width:${Math.round(b.have/b.need*100)}%"></i></span><span class="st">${b.done?'Done. Paid when the loop resets.':`${b.have} / ${b.need}${b.kind==='survive'?' minutes':''}`}</span></div>`).join('')}</div>
+    <p class="small">New bounties go up every morning. Finish them during a run, and the reward is waiting when you come back. Gear rewards are packed for your next run.</p>`;
+}
+
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.10.0';
+const GAME_VERSION='0.11.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2254,6 +2299,7 @@ function drawMenuArt(cv){
 function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is everything</h2>
   <div class="events">
   <div class="note"><b>Every action costs time.</b> Attacking, casting, healing and walking through a door all take seconds off your clock. Beating enemies and finding time shards gives seconds back.</div>
+  <div class="small"><b>Bounties.</b> The Notice Board posts three each loop. Complete them during a run and collect gold, crystals and sometimes gear when the loop resets.</div>
   <div class="small"><b>Rebuild the village.</b> Spend crystals and gold at the Notice Board on projects that last forever: the Smithy (temper, reroll and upgrade gear), a bigger tavern, a training yard, an apothecary and a watchtower.</div>
   <div class="small"><b>Milestone bosses.</b> From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes. Beat each boss to go deeper and win its Legendary gear, which binds to your hero for good. After the fourth, two reflections wait in the echoes, one loop after another.</div>
   <div class="small"><b>Survive the run.</b> Last until the survival target (30 minutes on a full run) without your clock hitting zero, and the run is cleared. Run out of time, or lose the whole party, and the loop resets.</div>
@@ -2761,6 +2807,7 @@ function eventsSheet(){
       ${e.ngp?`<div class="note" style="border-color:#e0ae52">You've freed Bleakthorpe twice. The loop is yours now: keep playing as long as you like.</div>`:`<div class="note" style="border-color:#e0ae52"><b>New Game+</b> is ready. Start again from loop 1 with your hero, skill tree, Sanctum, gold, crystals and the soulbound gear you're wearing. The companions, the bosses and the story begin again, and every enemy is 25% tougher.</div>`}</div>`}
     if(e.type==='ngplus')return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">New Game+</div>You wake in Bleakthorpe. Again. The fountain is frozen. Again. But you remember everything, even the loop where you won.</div>`;
     if(e.type==='milestone'){const B=MS_BY_KEY[e.key],nx=msNext();return `<div class="note" style="border-color:#e0ae52"><div class="eyebrow">Milestone</div><b>${esc(B.name)}</b> is beaten. <b>${esc(LEGENDS[B.legend].name)}</b> is bound to you forever.${nx?(nx.after?' Something is coming for you next loop.':` Deeper things stir in the dungeon. ${nx.loop<=M.loop?'Another door is waiting.':'The next waits at loop '+nx.loop+'.'}`):''}</div>`}
+    if(e.type==='bounty')return `<div class="note" style="border-color:#e0ae52"><b>Bounty paid:</b> ${esc(e.text)}. +${e.g} gold, +${e.c} crystal${e.c>1?'s':''}${e.item?`, and <b>${esc(e.item)}</b> packed for your next run`:''}.</div>`;
     if(e.type==='lost')return `<div class="note" style="border-color:var(--bad)"><b>${esc(e.name)}</b> the ${e.cls.toLowerCase()} is gone. The loop took them.</div>`;
     if(e.type==='beyond')return `<div class="note"><b>${esc(e.name)}</b> was down when the loop reset, but your memory held them. Beyond the Loop kept them with you.</div>`;
     if(e.type==='anchor')return `<div class="small">Anchor kept <b>${esc(e.name)}</b>.</div>`;
@@ -2968,7 +3015,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.10.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.11.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
