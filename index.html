@@ -199,6 +199,7 @@ body.big .wrap{zoom:1.12}
 /* town, gear, loot */
 .r-common{color:#d8d0bd}.r-uncommon{color:#93cf7e}.r-rare{color:#7fb0e8}.r-epic{color:#c09bef}.r-legendary{color:#f0a040;text-shadow:0 0 6px rgba(240,160,64,.4)}.st.uq{color:#f0c27a;font-style:italic}
 .ending .desc{font-size:15px;line-height:1.55}.credits{margin:14px 0;text-align:center;padding:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.smithrow{display:grid;gap:6px;margin-top:6px}.smithrow .btn{display:flex;justify-content:space-between}
 .rlbl.boss{background:#2a2008;color:#f0c27a;border-color:#e0ae52;box-shadow:0 0 8px rgba(224,174,82,.5)}
 .sb{color:var(--brass);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
 .item{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:2px;background:var(--ink);text-align:left;min-width:0}
@@ -669,9 +670,10 @@ function makeItem(ilvl,minRarity){
   const base=BASE[slot](t);const mult=rarity==='epic'?1.5:1;
   for(const k in base)add(k,Math.round(base[k]*mult));
   let pre='',suf='';
-  if(rarity!=='common'){const pk=tickets(PREFIX.map(x=>[x[0],x[1]]));const p=PREFIX.find(x=>x[0]===pk);pre=p[2]+' ';add(p[3],p[4](t))}
-  if(rarity==='rare'||rarity==='epic'){const sk=tickets(SUFFIX.map(x=>[x[0],x[1]]));const s=SUFFIX.find(x=>x[0]===sk);suf=' '+s[2];add(s[3],s[4](t))}
-  return {id:uid(),slot,rarity,lvl:ilvl,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<Math.min(40,CFG.soulbound+2*rank('thread')+(TF().soul||0))};
+  let preK=null,sufK=null;
+  if(rarity!=='common'){const pk=tickets(PREFIX.map(x=>[x[0],x[1]]));const p=PREFIX.find(x=>x[0]===pk);pre=p[2]+' ';add(p[3],p[4](t));preK=pk}
+  if(rarity==='rare'||rarity==='epic'){const sk=tickets(SUFFIX.map(x=>[x[0],x[1]]));const s=SUFFIX.find(x=>x[0]===sk);suf=' '+s[2];add(s[3],s[4](t));sufK=sk}
+  return {id:uid(),slot,rarity,lvl:ilvl,pre:preK,suf:sufK,name:pre+MATERIALS[t][0]+' '+PIECE[slot]+suf,stats,soul:Math.random()*100<Math.min(40,CFG.soulbound+2*rank('thread')+(TF().soul||0))};
 }
 function power(stats){const w={hp:.5,dmg:3,arm:.6,critC:2,critD:.4,dodge:2.5,tempo:2,timePct:1,patient:.5,renew:3};let p=0;for(const k in stats)p+=(stats[k]||0)*(w[k]||1);return p}
 function statLine(stats){return STAT_ORDER.filter(k=>stats[k]).map(k=>PCT_STATS.includes(k)?`+${stats[k]}${STAT_LABEL[k]}`:`+${stats[k]} ${STAT_LABEL[k]}`).join(' · ')||'No bonus'}
@@ -696,8 +698,8 @@ const SELL={common:4,uncommon:8,rare:16,epic:32,legendary:120};
 const BIND={common:2,uncommon:4,rare:8,epic:15};
 const rank=k=>(M&&M.sanctum&&M.sanctum[k])||0;
 function sanctumCost(k){const d=SANCTUM.find(x=>x[0]===k);return Math.round(d[2]*Math.pow(rank(k)+1,1.5))}
-function potionCap(){return 5+rank('pockets')}
-function priceOf(k){const d=STORE.find(x=>x[0]===k);return Math.round(d[2]*(1+.08*((hero()?hero().lvl:1)-1))*(1-(TF().discount||0)/100))}
+function potionCap(){return 5+rank('pockets')+(V('apoth')>=1?1:0)}
+function priceOf(k){const d=STORE.find(x=>x[0]===k);return Math.round(d[2]*(1+.08*((hero()?hero().lvl:1)-1))*(1-(TF().discount||0)/100)*(k==='potion'&&V('apoth')>=1?.8:1))}
 function sellValue(it){return Math.round(SELL[it.rarity]*(1+it.lvl/5))}
 function bindCost(it){return Math.max(1,BIND[it.rarity]+Math.floor(it.lvl/4)+((M&&M.binds)||0)-(TF().bindCut||0))}
 // potions and Phoenix Downs are always in; three of the five supplies rotate each loop, plus three pieces of basic gear
@@ -779,7 +781,7 @@ function respecCost(){return (M.tree.respecs||0)===0?0:10+treeOwned().length}
 function treeRespec(){const c=respecCost();if(M.crystals<c||!treeOwned().length)return;M.crystals-=c;M.tree.owned=[];M.tree.respecs=(M.tree.respecs||0)+1}
 // door hints: roll what's behind a door when the room is made, so a hint can tell the truth
 function rollType(st){const m=minutes(st),tf=TF();return tickets([['fight',48],['elite',m>=3?7:0],['treasure',12*(1+(tf.treasure||0)/100)],['shrine',7],['quiet',26]])}
-function fillDoors(st,room){const tf=TF();let ch=Math.min(100,tf.hint||0);if(tf.sixth||(tf.routes&&st.stats.rooms<3))ch=100;
+function fillDoors(st,room){const tf=TF();let ch=Math.min(100,(tf.hint||0)+(V('watch')>=1?15:0));if(tf.sixth||(tf.routes&&st.stats.rooms<3))ch=100;
   if(tf.sixth&&Math.random()<.2){const free=DIRS.filter(d=>d!==room.entry&&!room.doors[d]);if(free.length)room.doors[pick(free)]={}}
   for(const d in room.doors){const dr=room.doors[d];if(dr.echo||dr.nemesis||dr.milestone)continue;dr.type=rollType(st);dr.hint=Math.random()*100<ch}}
 const HINT={fight:'Fight',elite:'Elite',treasure:'Treasure',shrine:'Shrine',quiet:'Quiet'};
@@ -799,9 +801,9 @@ function hero(){return M.chars.find(c=>c.key==='hero')}
 function rollTavern(){
   const hl=hero().lvl;
   const keep=(M&&M.tavern||[]).filter(r=>r.stranger); // strangers wait for you
-  const slots=Math.max(0,3-keep.length);
+  const slots=Math.max(0,3+(V('tavern')>=1?1:0)-keep.length);
   const out=keep.slice();
-  for(let i=0;i<slots;i++)out.push({id:uid(),key:pick(COMP_KEYS),lvl:Math.max(1,hl-rnd(0,2)),stranger:null});
+  for(let i=0;i<slots;i++)out.push({id:uid(),key:pick(COMP_KEYS),lvl:Math.max(1,Math.min(hl,hl-rnd(0,2)+(V('tavern')>=2?2:0))),stranger:null});
   // every loop has at least one Cleric (the healer) and one tank among the fresh recruits
   const fresh=out.filter(r=>!r.stranger);
   if(fresh.length&&!out.some(r=>r.key==='cleric'))fresh[0].key='cleric';
@@ -845,7 +847,7 @@ function startRun(quick){
   const party=ids.map(id=>id==='hero'?hero():M.chars.find(c=>c.id===id)).filter(Boolean).map(c=>{const m=clone(c);m.hp=null;m.maxHp=null;m.down=false;m.downAt=null;refresh(m);m.hp=m.maxHp;return m});
   party.sort((a,b)=>CLASSES[b.key].speed-CLASSES[a.key].speed);
   ensureEconomy();const pk=M.pack||{};
-  S={phase:'room',timeLeft:CFG.startTime+15*rank('time')+20*(pk.watch||0),survival:0,party,items:{potion:Math.min(potionCap(),2+(pk.potion||0)+(TF().potionStart||0)),phoenix:1+(pk.phoenix||0),stopwatch:pk.stopwatch||0,smoke:pk.smoke||0},
+  S={phase:'room',timeLeft:CFG.startTime+15*rank('time')+20*(pk.watch||0)+(V('watch')>=2?20:0),survival:0,party,items:{potion:Math.min(potionCap(),2+(pk.potion||0)+(TF().potionStart||0)+(V('apoth')>=2?1:0)),phoenix:1+(pk.phoenix||0),stopwatch:pk.stopwatch||0,smoke:pk.smoke||0},
     buffs:{dmg:10*(pk.whetstone||0),arm:20*(pk.ward||0)},freeNext:false,bag:[],crystals:0,gold:0,
     enemies:[],turn:0,log:[],bossesDone:[],room:null,roomMsg:'',fight:null,sum:null,result:null,echoesFollowed:{},
     stats:{rooms:0,fights:0,kills:0,actions:0,spentAct:0,spentMove:0,earnFoes:0,earnTreasure:0,best:null,worst:null,playMs:0,items:0},
@@ -1201,7 +1203,7 @@ function winFight(st){
       const e=recallChar(c,'');m.name=c.name;m.talent=c.talent;m.stranger=null;m.cursed=c.cursed;nemWon.push(e)});
     st.nemWins=(st.nemWins||[]).concat(nemWon);st.party.forEach(m=>refresh(m))}
   const ups=[];
-  st.party.forEach(m=>{if(m.down)return;const tf=TF();m.xp+=Math.round(xp*(1+((m.key==='hero'?tf.heroXp:tf.compXp)||0)/100));let up=false;while(m.xp>=nextXp(m.lvl)){m.xp-=nextXp(m.lvl);m.lvl++;up=true}
+  st.party.forEach(m=>{if(m.down)return;const tf=TF();m.xp+=Math.round(xp*(1+(((m.key==='hero'?tf.heroXp:tf.compXp)||0)+(m.key==='hero'?0:10*V('yard')))/100));let up=false;while(m.xp>=nextXp(m.lvl)){m.xp-=nextXp(m.lvl);m.lvl++;up=true}
     if(up){refresh(m);m.hp=Math.min(m.maxHp,m.hp+CLASSES[m.key].grow);ups.push(`${m.name} → Lv ${m.lvl}`);
       const sk=CLASSES[m.key].skills.find(s=>s.lvl===m.lvl);if(sk)ups.push(`${m.name} learned ${sk.name}!`);if(m.key==='hero')ups.push('+1 skill point for the hero\'s tree')}});
   const net=earned-st.fight.spent,s=st.stats;
@@ -1278,7 +1280,7 @@ function applyReset(){
     const i=M.tavern.findIndex(x=>!x.stranger&&x.key===f.key);M.tavern.splice(i>=0?i:0,i>=0?1:0,r);
     ev.push({type:'stranger',cls:CLASSES[f.key].cls});
   });
-  M.tavern=M.tavern.slice(0,Math.max(3,M.tavern.filter(x=>x.stranger).length));
+  M.tavern=M.tavern.slice(0,Math.max(3+(V('tavern')>=1?1:0),M.tavern.filter(x=>x.stranger).length));
   M.events=ev;S=null;
 }
 function hire(rid,name){
@@ -1930,6 +1932,8 @@ const T_PLACES=[
  {k:'tavern',mk:[115,508],label:'The Tavern',box:[24,512,214,168],aria:'The Tavern'},
  {k:'cottage',mk:[568,768],label:'Your Cottage',box:[500,776,142,124],aria:'Your Cottage: gear'},
  {k:'party',mk:[325,846],label:'The Campfire',box:[250,850,150,150],aria:'The Campfire: choose your party'},
+ {k:'board',label:'Notice Board',box:[200,730,64,64],mk:[234,728],aria:'The Notice Board: rebuild the village'},
+ {k:'forge',label:'The Old Forge',box:[160,985,130,110],mk:[226,982],aria:'The forge'},
  {k:'shop',mk:[68,928],label:'General Store',box:[4,936,134,120],aria:'The General Store'}
 ];
 // points of interest on the painting (canvas pixels)
@@ -1969,6 +1973,7 @@ function drawTown(cv){
   glow(g,...TP.sign,16,'255,200,110',.12);
   glow(g,...TP.basin,40,'120,200,255',.08+.05*pulse(2));
   g.restore();
+  drawBuilt(g,t,still);
   /* --- stars --- */
   T_STARS.forEach(([x,y,ph,sp,big])=>{const v=Math.sin(t*sp+ph);if(v<-.2)return;const c=v>.75?'#ffffff':v>.3?'#c8d4ff':'#7f8ab8';
     g.fillStyle=c;g.fillRect(x,y,2,2);if(big&&v>.85){g.fillRect(x-2,y,6,2);g.fillRect(x,y-2,2,6)}});
@@ -2051,6 +2056,8 @@ const TOUR=[
  {place:'cottage',t:'Your Cottage',p:'Check and change your gear here. Only soulbound gear survives when the loop resets.'},
  {place:'wizard',t:'The Wizard\'s Tower',p:'Spend crystals in his Sanctum for permanent upgrades. He knows more than he lets on.'},
  {place:'memorial',t:'The Memorial Stone',p:'Companions the loop takes from you are remembered here.'},
+ {place:'board',t:'The Notice Board',p:'Spend crystals and gold to rebuild Bleakthorpe. What you build here, the loop can\'t undo.'},
+ {place:'forge',t:'The Old Forge',p:'Rebuild it from the Notice Board, and the smith will temper, reroll and upgrade your gear.'},
  {btn:'partyinfo',t:'Your party',p:'See your team\'s levels, stats and XP at a glance.'},
  {btn:'tree',t:'Skills',p:'Spend skill points on your hero\'s web of skills. A number shows here when you have points to spend.'},
  {btn:'gate',t:'Into the dungeon',p:'A quick way through the Edge of Time.'},
@@ -2074,16 +2081,121 @@ function tourHTML(){
 function townMapHTML(){
   const tavBadge=M.tavern.some(r=>r.stranger)?'?':(M.freeHires>0?'!':'');
   const lostN=(M.memorial||[]).length;
-  const badge={tavern:tavBadge,memorial:lostN?String(lostN):''};
+  const badge={tavern:tavBadge,memorial:lostN?String(lostN):'',board:!Object.keys(M.village||{}).length&&M.crystals>=4?'!':''};
   const extra={tavern:tavBadge==='?'?', someone familiar is waiting':'',memorial:`, ${lostN} names`};
   return `<div class="tmap${UI.tour!=null&&TOUR[UI.tour]&&TOUR[UI.tour].names?' names':''}"><canvas id="town" width="${TWc}" height="${THc}" role="img" aria-label="Pixel map of the hamlet"></canvas>
     ${T_PLACES.map(p=>{const[x,y,w,h]=p.box;return `<button class="tplace" data-place="${p.k}" aria-label="${esc(p.aria+(extra[p.k]||''))}"
-      style="left:${x/TWc*100}%;top:${y/THc*100}%;width:${w/TWc*100}%;height:${h/THc*100}%${p.lblY?`;justify-content:flex-start;padding-top:${p.lblY/TWc*100}%`:''}">${badge[p.k]?`<span class="tbadge">${badge[p.k]}</span>`:''}<span class="tlbl">${esc(p.label)}</span></button>`}).join('')}
+      style="left:${x/TWc*100}%;top:${y/THc*100}%;width:${w/TWc*100}%;height:${h/THc*100}%${p.lblY?`;justify-content:flex-start;padding-top:${p.lblY/TWc*100}%`:''}">${badge[p.k]?`<span class="tbadge">${badge[p.k]}</span>`:''}<span class="tlbl">${esc(p.k==='forge'&&V('forge')?'The Smithy':p.label)}</span></button>`}).join('')}
     ${townRound()}${UI.tour!=null?tourHTML():''}</div>`;
 }
 
+/* ======================= rebuilding Bleakthorpe and the Smithy (since 0.10.0) ======================= */
+// Projects are paid for with crystals and gold at the Notice Board. The wizard binds each one with crystal, so the
+// reset can't undo them (and New Game+ keeps them). M.village[k] = tier built.
+const VILLAGE=[
+ {k:'forge',name:'The Smithy',tiers:[{c:6,g:150,d:'Rebuild the old forge. Temper your gear up to your level and reroll its affixes.'},
+   {c:10,g:350,d:'Better tools: upgrade gear to Uncommon or Rare.'},{c:16,g:700,d:'A master smith: upgrade gear to Epic, and smithing costs 25% less.'}]},
+ {k:'tavern',name:'Tavern Extension',tiers:[{c:5,g:120,d:'More rooms: one more recruit waits at the tavern each loop.'},{c:9,g:300,d:'Better reputation: recruits arrive up to 2 levels higher.'}]},
+ {k:'yard',name:'Training Yard',tiers:[{c:4,g:100,d:'Companions gain 10% more XP.'},{c:8,g:260,d:'Companions gain 20% more XP.'}]},
+ {k:'apoth',name:'Apothecary',tiers:[{c:4,g:120,d:'Carry one more potion, and potions cost 20% less.'},{c:8,g:300,d:'Start every run with a free potion.'}]},
+ {k:'watch',name:'Watchtower',tiers:[{c:5,g:150,d:'15% more doors show what\'s behind them.'},{c:9,g:320,d:'Start every run with +20 seconds on the clock.'}]}];
+const V=k=>(M&&M.village&&M.village[k])||0;
+function buildProject(k){const P=VILLAGE.find(x=>x.k===k),t=V(k),T=P&&P.tiers[t];if(!T||M.crystals<T.c||(M.gold||0)<T.g)return false;
+  M.crystals-=T.c;M.gold-=T.g;M.village=M.village||{};M.village[k]=t+1;UI.built=k;return true}
+function boardSheet(){
+  return `<div class="eyebrow">The Notice Board · Crystals ${M.crystals} · Gold ${M.gold||0}</div><h2>Rebuild Bleakthorpe</h2>
+    <p class="desc">The loop resets the day, but the wizard binds every stone you lay with crystal. Time can't unbuild what time itself paid for.</p>
+    <div class="events">${VILLAGE.map(P=>{const t=V(P.k),T=P.tiers[t],can=T&&M.crystals>=T.c&&(M.gold||0)>=T.g;
+      return `<div class="item ${UI.built===P.k?'soul':''}"><span class="nm">${esc(P.name)}${t?` <span class="small">· ${t>=P.tiers.length?'complete':'level '+t}</span>`:''}</span>
+        ${P.tiers.slice(0,t).map(x=>`<span class="st" style="color:#93cf7e">✓ ${esc(x.d)}</span>`).join('')}
+        ${T?`<span class="st">${t?'Next: ':''}${esc(T.d)}</span><button class="btn" data-build="${P.k}" ${can?'':'disabled'} style="min-height:40px">${t?'Upgrade':'Build'} · ${T.c} crystals, ${T.g} gold</button>`:''}</div>`}).join('')}</div>
+    <button class="btn primary" data-a="close">Leave</button>`;
+}
+// --- the Smithy: temper (raise to the wearer's level), reroll an affix, upgrade rarity ---
+const R_ORDER=['common','uncommon','rare','epic'];
+function tierOf(l){let t=0;MATERIALS.forEach(([,m],i)=>{if(l>=m)t=i});return t}
+function itemParts(it){
+  const pre=it.pre!==undefined?it.pre:((PREFIX.find(p=>it.name.startsWith(p[2]+' '))||[null])[0]);
+  const suf=it.suf!==undefined?it.suf:((SUFFIX.find(x=>it.name.endsWith(' '+x[2]))||[null])[0]);
+  return {pre,suf}}
+function buildItem(it,o){
+  if(it.rarity==='legendary'){const L=makeLegend(it.uniq,o.lvl);it.lvl=L.lvl;it.stats=L.stats;return it}
+  const t=tierOf(o.lvl),stats={},add=(k,v)=>stats[k]=(stats[k]||0)+v,base=BASE[it.slot](t),mult=o.rarity==='epic'?1.5:1;
+  for(const k in base)add(k,Math.round(base[k]*mult));
+  let pn='',sn='';
+  if(o.pre){const p=PREFIX.find(x=>x[0]===o.pre);pn=p[2]+' ';add(p[3],p[4](t))}
+  if(o.suf){const x=SUFFIX.find(y=>y[0]===o.suf);sn=' '+x[2];add(x[3],x[4](t))}
+  Object.assign(it,{rarity:o.rarity,lvl:o.lvl,stats,pre:o.pre||null,suf:o.suf||null,name:pn+MATERIALS[t][0]+' '+PIECE[it.slot]+sn});return it}
+const rollAffix=(list,not)=>{let k;do{k=tickets(list.map(x=>[x[0],x[1]]))}while(k===not&&list.length>1);return k};
+function smithCost(kind,it){const off=V('forge')>=3?.75:1,L=it.lvl;
+  const c={temper:[1,5*L],repre:[1,20+2*L],resuf:[1,20+2*L],up_uncommon:[2,40],up_rare:[3,90],up_epic:[5,180]}[kind];
+  return {c:c[0],g:Math.round(c[1]*off)}}
+function smithOptions(it,owner){
+  const o=[],r=it.rarity,P=itemParts(it);
+  if(it.lvl<owner.lvl)o.push(['temper',`Temper to level ${owner.lvl}`]);
+  if(r!=='legendary'){
+    if(P.pre)o.push(['repre','Reroll the prefix']);
+    if(P.suf)o.push(['resuf','Reroll the suffix']);
+    const nx=R_ORDER[R_ORDER.indexOf(r)+1];
+    if(nx&&(nx==='epic'?V('forge')>=3:V('forge')>=2))o.push(['up_'+nx,`Upgrade to ${R_NAME[nx]}`]);
+  }
+  return o}
+function smith(ci,slot,kind){
+  const c=M.chars[ci],it=c&&c.gear[slot];if(!it)return;
+  if(!smithOptions(it,c).some(([k])=>k===kind))return;
+  const cost=smithCost(kind,it);if(M.crystals<cost.c||(M.gold||0)<cost.g)return;
+  M.crystals-=cost.c;M.gold-=cost.g;
+  const P=itemParts(it);
+  if(kind==='temper')buildItem(it,{pre:P.pre,suf:P.suf,rarity:it.rarity,lvl:c.lvl});
+  else if(kind==='repre')buildItem(it,{pre:rollAffix(PREFIX,P.pre),suf:P.suf,rarity:it.rarity,lvl:it.lvl});
+  else if(kind==='resuf')buildItem(it,{pre:P.pre,suf:rollAffix(SUFFIX,P.suf),rarity:it.rarity,lvl:it.lvl});
+  else{const nx=kind.slice(3);buildItem(it,{pre:P.pre||rollAffix(PREFIX),suf:(nx==='rare'||nx==='epic')?(P.suf||rollAffix(SUFFIX)):P.suf,rarity:nx,lvl:it.lvl})}
+  UI.smithLast=it.id;SFX.buff();
+}
+const SMITH_LINES=['Bring it here. Let\'s see what the loop left of it.','Steel remembers, you know. Even when people don\'t.','Same forge every morning. Same fire. Never gets old. Well. It does.','Mind the sparks. They\'re the only thing in this village that moves on time.'];
+function forgeSheet(){
+  if(!V('forge'))return `<div class="eyebrow">The Old Forge</div><h2>Cold and broken</h2>
+    <p class="desc">The roof has fallen in, and the anvil is half buried in rubble. Someone could make something of this place again.</p>
+    <div class="note">Rebuild it at the <b>Notice Board</b> in the square: 6 crystals and 150 gold.</div>
+    <div class="row"><button class="btn" data-a="close">Leave</button><button class="btn primary" data-place="board">Go to the Notice Board</button></div>`;
+  if(!UI.smithLine||UI.smithLoop!==M.loop){UI.smithLine=pick(SMITH_LINES);UI.smithLoop=M.loop}
+  const ci=Math.min(UI.smithChar||0,M.chars.length-1),c=M.chars[ci];
+  const items=SLOTS.filter(sl=>c.gear[sl]);
+  return `<div class="eyebrow">The Smithy · level ${V('forge')} · Crystals ${M.crystals} · Gold ${M.gold||0}</div><h2>Reforge</h2>
+    <div class="note"><span class="eyebrow">The smith</span><br><i>"${esc(UI.smithLine)}"</i></div>
+    <div class="seg" style="flex-wrap:wrap">${M.chars.map((x,i)=>`<button class="btn ${i===ci?'on':''}" data-smithc="${i}">${esc(x.name)}</button>`).join('')}</div>
+    <p class="small">Work on the gear ${esc(c.name)} is wearing. Tempering raises an item to their level (Lv ${c.lvl}) and keeps its affixes. ${V('forge')<2?'Upgrade the Smithy at the Notice Board to raise rarity.':''}</p>
+    ${items.length?items.map(sl=>{const it=c.gear[sl],opts=smithOptions(it,c);
+      return itemCard(it,opts.length?`<div class="smithrow">${opts.map(([k,l])=>{const co=smithCost(k,it),can=M.crystals>=co.c&&(M.gold||0)>=co.g;
+        return `<button class="btn" data-smith="${ci}:${sl}:${k}" ${can?'':'disabled'} style="min-height:38px"><span>${l}</span><span class="cost">${co.c}✦ ${co.g}g</span></button>`}).join('')}</div>`:'<span class="small">Nothing to do here right now.</span>')}).join('')
+      :'<p class="small">They aren\'t wearing anything. Gear only stays between loops if it\'s soulbound and worn.</p>'}
+    <button class="btn primary" data-a="close">Leave</button>`;
+}
+// code-drawn additions to the painting, in 4px blocks to match it
+function drawBuilt(g,t,still){
+  const blk=(ox,oy,B)=>(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(ox+x*B,oy+y*B,w*B,h*B)};
+  // notice board in the square
+  {const R=blk(214,744,3);R(0,7,1,7,'#4a3220');R(11,7,1,7,'#4a3220');R(-1,0,14,8,'#2a1e16');R(0,1,12,6,'#7a5a36');R(1,2,3,4,'#d8ccb0');R(5,2,3,3,'#c8bca0');R(9,2,2,4,'#e8dcc0');R(5,5,3,1,'#b0a488')}
+  // the forge in the meadow by the south road
+  const R=blk(176,1000,4);
+  if(!V('forge')){R(1,20,24,2,'rgba(0,0,0,.25)');R(1,15,7,6,'#4f4b58');R(1,15,7,1,'#5f5b68');R(15,17,9,4,'#4a4654');R(17,9,3,12,'#55505e');R(16,9,2,1,'#3e3a46');
+    R(9,19,4,2,'#3a3a44');R(5,21,2,1,'#5f5b68');R(12,22,2,1,'#4f4b58');R(22,21,2,1,'#5f5b68');R(3,13,2,2,'#6a3328');R(20,14,3,2,'#4e241c');return}
+  R(0,20,26,2,'rgba(0,0,0,.3)');
+  R(1,9,22,11,'#5d5866');for(let i=0;i<10;i++)R(2+((i*7)%20),10+((i*5)%9),2,1,'#4a4654');
+  for(let r=0;r<7;r++){const w=6+r*3;R(12-w/2,2+r,w,1,r<4?'#6a3328':'#5a2a20')}R(-1,9,26,1,'#3a1a14');
+  R(17,0,3,6,'#55505e');R(16,0,5,1,'#3e3a46');
+  R(3,12,9,8,'#140e14');const fl=still?.6:.5+.5*Math.sin(t*8)*Math.sin(t*3.1);R(4,16,7,3,`rgba(255,${120+Math.round(60*fl)},50,1)`);R(5,17,5,1,'#ffd060');
+  R(15,12,4,4,'#2a1e16');R(15.5,12.5,3,3,'#ffcf6a');R(15.5,13.75,3,.5,'#c08a40');
+  R(19,18,5,1,'#3a3a44');R(20,19,3,2,'#2a2a30');R(24,10,1,4,'#4a3220');R(22,14,4,3,'#6a4a2c');R(23,15,2,1,'#c8ccd8');
+  g.save();g.globalCompositeOperation='lighter';const gr=g.createRadialGradient(206,1070,0,206,1070,70);gr.addColorStop(0,`rgba(255,140,50,${.22+.1*fl})`);gr.addColorStop(1,'rgba(255,140,50,0)');g.fillStyle=gr;g.fillRect(136,1000,140,140);g.restore();
+  if(!still&&Math.random()<.5){if(TOWN.parts.length<260)TOWN.parts.push({type:'smoke',x:250+Math.random()*6,y:998,vx:5+Math.random()*4,vy:-12-Math.random()*6,age:0,life:3.5,sz:4+Math.random()*3})}
+  if(!still&&Math.random()<.12){if(TOWN.parts.length<260)TOWN.parts.push({type:'ember',x:200+Math.random()*20,y:1066,vx:(Math.random()-.5)*30,vy:-40-Math.random()*30,age:0,life:.8,ph:0})}
+  // training yard dummies, once built
+  if(V('yard')){const Y=blk(410,1040,4);Y(0,6,20,1,'#6a4a2c');Y(0,4,1,4,'#4a3220');Y(19,4,1,4,'#4a3220');[[4,0],[12,0]].forEach(([x])=>{Y(x+1,2,1,7,'#4a3220');Y(x,0,3,3,'#c8a860');Y(x-1,3,5,2,'#b89848')})}
+}
+
 /* ======================= version, settings, sound, reviews ======================= */
-const GAME_VERSION='0.9.0';
+const GAME_VERSION='0.10.0';
 const KOFI='https://ko-fi.com/kralnu90';
 const SET=Object.assign({speed:'normal',sound:true,text:'normal',tools:false},store.get('t2r-settings')||{});
 function applySet(){document.body.classList.toggle('big',SET.text==='large')}
@@ -2142,6 +2254,7 @@ function drawMenuArt(cv){
 function howtoSheet(){return `<div class="eyebrow">How to play</div><h2>Time is everything</h2>
   <div class="events">
   <div class="note"><b>Every action costs time.</b> Attacking, casting, healing and walking through a door all take seconds off your clock. Beating enemies and finding time shards gives seconds back.</div>
+  <div class="small"><b>Rebuild the village.</b> Spend crystals and gold at the Notice Board on projects that last forever: the Smithy (temper, reroll and upgrade gear), a bigger tavern, a training yard, an apothecary and a watchtower.</div>
   <div class="small"><b>Milestone bosses.</b> From loops 5, 10, 15 and 20, a gold door appears once you've survived 20 minutes. Beat each boss to go deeper and win its Legendary gear, which binds to your hero for good. After the fourth, two reflections wait in the echoes, one loop after another.</div>
   <div class="small"><b>Survive the run.</b> Last until the survival target (30 minutes on a full run) without your clock hitting zero, and the run is cleared. Run out of time, or lose the whole party, and the loop resets.</div>
   <div class="small"><b>The loop always resets.</b> Your levels stay. Gear turns to dust unless it's <b class="sb">soulbound</b> and you're wearing it. After a cleared run you get 30 seconds of frozen time to swap gear.</div>
@@ -2433,6 +2546,8 @@ function initTree(){
 }
 function placeSheet(kind){
   if(kind==='wizard')return wizardSheet();
+  if(kind==='board')return boardSheet();
+  if(kind==='forge')return forgeSheet();
   if(kind==='tavern')return `<div class="eyebrow">The Tavern${M.freeHires>0?` · the keeper owes you ${M.freeHires} free hire${M.freeHires>1?'s':''}`:''}</div><h2>Looking for work</h2>
     ${speak('tavern','The keeper',keeperLines())}
     <p class="small">Recruits change every loop. Strangers wait for you.</p>${tavernHTML()}<button class="btn primary" data-a="close">Leave</button>`;
@@ -2585,7 +2700,7 @@ function renderSheet(){
   else if(kind==='events')h=eventsSheet();
   else if(kind==='abandon')h=`<h2>Abandon this run?</h2><p class="desc">It counts as running out of time: anyone who's down is lost, and only equipped soulbound gear is kept.</p>
     <div class="row"><button class="btn" data-a="close">Keep playing</button><button class="btn primary" data-a="abandonyes">Abandon</button></div>`;
-  else if(['wizard','tavern','party','gate','memorial','shop','sanctum','tree','market'].includes(kind))h=placeSheet(kind);
+  else if(['wizard','tavern','party','gate','memorial','shop','sanctum','tree','market','board','forge'].includes(kind))h=placeSheet(kind);
   else if(kind==='wipe')h=`<h2>Reset all progress?</h2><p class="desc">This deletes your hero, companions, crystals and loops on this device.</p>
     <div class="row"><button class="btn" data-a="settings">Back</button><button class="btn primary" data-a="wipeyes">Delete everything</button></div>`;
   sheet.hidden=false;sheet.innerHTML=`<div role="dialog">${h}</div>`;
@@ -2709,6 +2824,9 @@ document.addEventListener('click',e=>{
   if(d.sell){sellItem(S,d.sell);SFX.buff();save();render();return}
   if(d.bgear){buyGear(d.bgear);SFX.buff();save();render();return}
   if(d.buy){buy(d.buy);SFX.buff();save();render();return}
+  if(d.build){if(buildProject(d.build)){SFX.win();if(d.build==='tavern')M.tavern=rollTavern()}save();render();return}
+  if(d.smithc!=null){UI.smithChar=+d.smithc;render();return}
+  if(d.smith){const[ci,sl,k]=d.smith.split(':');smith(+ci,sl,k);save();render();return}
   if(d.sanc){buySanctum(d.sanc);SFX.buff();save();render();return}
   if(d.bind){const party=[hero()].concat(M.party.map(id=>M.chars.find(c=>c.id===id)).filter(Boolean));bindItem(party[UI.gearChar],d.bind);SFX.buff();save();render();return}
   switch(d.a){
@@ -2850,7 +2968,7 @@ html:not(.kg-can-install) [data-install]{display:none!important}
 // Kralnu Games update check. When you push an update, change the game's version
 // AND version.json to the same new value; players then get a "new version" notice.
 (function(){
-  var NAME="30× to Remember",BUILD="0.9.0",CACHES=["tr-"],CHECK=true;
+  var NAME="30× to Remember",BUILD="0.10.0",CACHES=["tr-"],CHECK=true;
   var path=location.pathname,dir=path.replace(/[^/]*$/,''),last=0,bar=null,busy=false;
   if(/^\?v=\d+$/.test(location.search)){try{history.replaceState(history.state,'',path+location.hash)}catch(e){}}
   function build(){return String(window.kgBuild!=null?window.kgBuild:BUILD)}
